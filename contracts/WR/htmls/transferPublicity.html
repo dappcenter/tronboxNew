@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <title>publicity</title>
+</head>
+<body style="margin: 3em;">
+<button class="btn btn-primary" type="button" id="makedata">Generate Input Data</button>
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="../js/common.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+<script>
+//需要上级页面传递token，转账地址，数量
+    var app = new Vue({
+        data: {
+            datainfo: {
+                needApproveValue : null,
+                // approverBalance:null,
+                addrcnt: null,//地址个数
+                ttvalue: null,//token总量
+                gasbase: 42000,
+                gasPrice: null,
+                gaslimit: null,
+                currblockgas: null,//laest block 的gasLimit
+                splitgas: null,  //每组最大gasLimit
+                splitcnt: null,  //分组个数
+                onesplitaddrcnt: null,//每组地址数量
+                curridx: 0,
+                gasTotal:null,//总的gas费
+                payTotal:null //总的合约执行费
+            },
+            splits:[] //分组数据
+        },methods: {
+            transferBatch: function (addressValueStr, tokenAddress, tokenDecimal) {
+                App.refreshGasPrice();
+                var addressAndValue = parseInput(addressValueStr);
+                app.datainfo.addrcnt = addressAndValue.length;
+
+                app.datainfo.gaslimit = app.datainfo.gasbase * app.datainfo.addrcnt;
+
+                App.web3js.eth.getBlock("latest",false,function(err,res){
+                    if (err){
+                        alert("failed to get lastest block info. "+err);
+                        return;
+                    }
+                    app.datainfo.currblockgas = res.gasLimit;
+                    app.datainfo.splitgas = res.gasLimit * 0.9;
+                    app.datainfo.onesplitaddrcnt = Math.floor(app.datainfo.splitgas/app.datainfo.gasbase);
+                    app.datainfo.splitcnt = Math.ceil(app.datainfo.addrcnt/app.datainfo.onesplitaddrcnt);
+
+                    var sum = new App.web3js.BigNumber(0);
+                    var index = 1;
+                    var addresses=new Array();
+                    var values=new Array();
+                    var splitTotalValue = new App.web3js.BigNumber(0);
+                    for(var line of addressAndValue){
+                        var parts = line.split(',');
+                        if (parts.length == 1) parts = line.split(' ');
+                        if (parts.length == 1){
+                            alert("input line is wrong: "+line+". Need address and value both. Separated by tab");
+                            return;
+                        }
+                        addresses.push(parts[0].trim());
+                        var value = new App.web3js.BigNumber(parts[1]);
+                        var valueDecimal = value.times( new App.web3js.BigNumber("1e+"+ tokenDecimal) );
+                        values.push(valueDecimal);
+                        splitTotalValue = splitTotalValue.plus(valueDecimal);
+                        sum = sum.plus(value);
+                        if(index++ % app.datainfo.onesplitaddrcnt===0 || index === app.datainfo.addrcnt){
+                            var split = {
+                                addresses: addresses,
+                                values:values,
+                                splitTotalValue:splitTotalValue,
+                                estimateGas : null,
+                                payValue : null,
+                                txid: null,
+                                startTime: null,
+                                endTime: null,
+                                blkId: null,
+                                state: "prepare"
+                            };
+                            app.splits.push(split);
+                            addresses = new Array();
+                            values=new Array();
+                            splitTotalValue = new App.web3js.BigNumber(0);
+                        }
+                    }
+                    this.datainfo.ttvalue = sum;
+                    app.datainfo.gasPrice = App.web3js.toWei(App.gaspriceInGWei,"gwei");
+                    estimateGas(tokenAddress);
+                });
+            },
+            transferBatchd: function () {
+                tempGasTotal = new App.web3js.BigNumber(0);
+                tempPayTotal = new App.web3js.BigNumber(0);
+                app.transferBatch("0x8cF24141e4F38064DE3E66D57e78C566AAC51755,45","0x6F601fCc2050Af60A17dDA5333b10f81277B8eD6",18);
+            }
+        }
+    });
+
+
+    function parseInput(stringinput){
+        return stringinput.split('\n');
+    }
+
+    var tempGasTotal;
+    var tempPayTotal;
+
+    function estimateGas(tokenAddress, tokenDecimal){
+        var tokenContract = App.getTokenContract(tokenAddress);
+        var needAllowance = app.datainfo.ttvalue;
+        tokenContract.allowance(App.defaultAccount, App.spender, function(err, res){
+            if (err){
+                alert("failed to get allowance of "+ App.spender +" in token "+ tokenContract);
+                return;
+            }
+            if (res.gte(needAllowance)){
+                app.datainfo.needApproveValue = new App.web3js.BigNumber(0);
+                caluTotalCost(tokenAddress, 0, tokenDecimal);
+            }else {
+                app.datainfo.needApproveValue = needAllowance.times(new App.web3js.BigNumber("1e+"+ tokenDecimal)).minus(res);
+                var sendData = tokenContract.approve.getData(App.spender ,app.datainfo.ttvalue);
+                App.web3js.eth.estimateGas({"to":tokenAddress,"data":sendData},function(err,res){
+                    if(err){
+                        alert("estimate approve gas failed:"+err);
+                        return;
+                    }
+                    console.log("estimate approve gas is ",res);
+
+                    var estimateApproGas = new App.web3js.BigNumber(res + 21000);
+
+                    var usedPrice = app.datainfo.gasPrice;
+                    if (!usedPrice) usedPrice = App.web3js.toWei(App.gaspriceInGWei,"gwei");
+                    tempGasTotal = tempGasTotal.plus(estimateApproGas.times(usedPrice));
+                    caluTotalCost(tokenAddress, 0, tokenDecimal);
+                });
+            }
+        });
+    }
+    function caluTotalCost(tokenAddress, currentIndex, tokenDecimal){
+        if(!app.splits) return;
+        if (currIdx == app.splits.length){
+            var power = new web3.BigNumber("1e+"+tokenDecimal);
+            app.datainfo.gasTotal = tempGasTotal.div(power);
+            app.datainfo.payTotal = tempPayTotal.div(power);
+            caluCompelete();
+            return;
+        }
+        var splitInfo = app.splits[currentIndex];
+        console.log((splitInfo.addresses instanceof Array )+ '========>' + splitInfo.values);
+        var sendData = App.spenderContract.multiTransferTokenValues.getData(tokenAddress,splitInfo.addresses,
+            splitInfo.values);
+        App.web3js.eth.estimateGas({"to":App.spender,"data":sendData},function(err,res){
+            if(err){
+                alert("estimate gas failed:"+err + ",cuurentIndex=" + currentIndex);
+                return;
+            }
+            console.log("estimate gas is ",res," for ",splitInfo.addresses," addresses");
+            if (res < app.datainfo.gasbase * splitInfo.addresses.length * 0.75){
+                res = app.datainfo.gasbase * splitInfo.addresses.length;
+            }
+            splitInfo.estimateGas = new App.web3js.BigNumber(res + 21000);
+
+            var usedPrice = app.datainfo.gasPrice;
+            if (!usedPrice) usedPrice = App.web3js.toWei(App.gaspriceInGWei,"gwei");
+            App.spenderContract.guessGasWithValuesView(tokenAddress,splitInfo.addresses.length,splitInfo.splitTotalValue,usedPrice,
+                function(err,sendValue){
+                    if(err){
+                        alert("guess contract pay failed:"+err + ",cuurentIndex=" + currentIndex);
+                        return;
+                    }
+                    app.splits[currentIndex].payValue = sendValue;
+                    tempGasTotal = tempGasTotal.plus(splitInfo.estimateGas.times(usedPrice));
+                    tempPayTotal = tempPayTotal.plus(new App.web3js.BigNumber(sendValue));
+                    caluTotalCost(tokenAddress, currentIndex + 1, tokenDecimal);
+                });
+        });
+    }
+    function caluCompelete(){
+
+    }
+window.addEventListener('load', function() {
+    App.init();
+});
+</script>
+</body>
+</html>

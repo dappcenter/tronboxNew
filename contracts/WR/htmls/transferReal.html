@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <title>TransferReal</title>
+</head>
+<body style="margin: 3em;">
+<h1>TransferReal</h1>
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="../js/common.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+<script>
+//需要上级页面传递token，转账地址，数量
+    var app = new Vue({
+        data: {
+            datainfo: {
+                tokenAddress : "0x0186a4BD21Bdc648d2B89Bf8CDB4fDA41bfb2f76",
+                needApproveValue : 123,
+                // approverBalance:null,
+                addrcnt: null,//地址个数
+                ttvalue: null,//token总量
+                gasbase: 42000,
+                gasPrice: null,
+                gaslimit: null,
+                currblockgas: null,//laest block 的gasLimit
+                splitgas: null,  //每组最大gasLimit
+                splitcnt: null,  //分组个数
+                onesplitaddrcnt: null,//每组地址数量
+                curridx: 0,
+                gasTotal:null,//总的gas费
+                payTotal:null //总的合约执行费
+            },
+            splits:[] //分组数据
+        },methods: {
+            approveReal: function () {
+                var oTokenInst = App.getTokenContract(app.datainfo.tokenAddress);
+                // var wEvent = oTokenInst.Approval({"_spender":App.spender});
+                // oTokenInst.approve.sendTransaction(App.spender,new App.web3js.BigNumber(app.datainfo.needApproveValue),getApproveTxCallBack(wEvent));
+                var sendDataTrans = oTokenInst.transfer.getData(App.spender, 5);
+                App.web3js.eth.estimateGas({ "to": app.datainfo.tokenAddress, "data": sendDataTrans }, (err, res) => {
+                    if (err) {
+                        alert("estimate simple transfer gas failed:" + err);
+                        return;
+                    }
+                    App.web3js.eth.getGasPrice(function (err, res) {
+                        if (err) {
+                            console.log('cannot get mediem gas price: ' + err)
+                            return
+                        }
+                        console.log(res);
+                    })
+                    console.log(res);
+                });
+            },
+            transferAll: function(){
+                if (app.datainfo.splitcnt == null || app.datainfo.tokenAddress == null){
+                    alert("please check data first");
+                    return;
+                }
+                realSend(0, getStateChangeCallBack(realSend,0));
+            }
+        }
+    });
+    function realSend(currentIndex, callback){
+        if(currentIndex > app.splits.length - 1)return;
+        var splitInfo = app.splits[currentIndex];
+        if(splitInfo.txid ){
+            callback(splitInfo.txid, null);
+            return;
+        }
+        var usedPrice = app.datainfo.gasPrice;
+        if (!usedPrice) usedPrice = App.web3js.toWei(App.gaspriceInGWei,"gwei");
+        var tmpSendParam = {"gas":splitInfo.estimateGas,"gasPrice":usedPrice};
+        tmpSendParam.value = splitInfo.payValue;
+        var lastAddr = splitInfo.addresses[splitInfo.addresses.length-1];
+        var wEvent = oTokenInst.Transfer({"_to":lastAddr,"_from":App.defaultAccount});
+        App.spenderContract.multiTransferTokenValues.sendTransaction(app.datainfo.tokenAddress,splitInfo.addresses,
+            splitInfo.values,tmpSendParam,getMultiTxCallBack(wEvent, callback, currentIndex));
+    }
+    function getMultiTxCallBack(wEvent,callback, currentIndex){
+        return function(err, res){
+            if (err){//发送交易失败
+                alert("send Transaction failed : "+err);
+                return;
+            }
+            var txid = res;
+            wEvent.watch(function(err, res){
+                if (err){//交易确认失败
+                    app.txinfo+= " event watch failed: "+wEvent;
+                    app.splits[currentIndex].txid = null;
+                    app.splits[currentIndex].state = "Failed";
+                    return;
+                }
+                if (res.transactionHash == txid){
+                    app.txinfo += " transaction success at block "+res.blockNumber;
+                    wEvent.stopWatching();
+                    callback(txid,res);
+                    return;
+                }
+                else{
+                    app.txinfo="txId: "+txid+", curr: "+res.transactionHash;
+                }
+            });
+            callback(txid,null);
+        }
+    }
+
+    function getStateChangeCallBack(sendFunction,currIdx){
+        app.datainfo.currIdx = currIdx;
+        app.splits[currIdx].startTime = new Date().getTime();
+        app.splits[currIdx].state = "WaitToSubmit";
+        return function(txid, transactionInfo){
+            app.splits[currIdx].txid = txid;
+            if (transactionInfo == null) {
+                app.splits[currIdx].state = "Submitted";
+                sendFunction(currIdx+1,getStateChangeCallBack(sendFunction,currIdx+1));
+                return;
+            }
+            app.splits[currIdx].blkId = transactionInfo.blockNumber;
+            app.splits[currIdx].endTime = new Date().getTime();
+            app.splits[currIdx].state = "Finished";
+            if (currIdx == app.splits.length - 1){
+                allSplitConfirmDone();
+                return;
+            }
+        }
+    }
+    function isNeedApprove(){
+        return app.datainfo.needApproveValue && new App.web3js.BigNumber(0).lt(app.datainfo.needApproveValue);
+    }
+    function approveSubmited(approveTxId){
+console.log(approveTxId);
+    }
+    function approveConfirm(result){
+console.log(result);
+    }
+    function allSplitConfirmDone(){
+        alert("All split are done. All finished.");
+    }
+    function getApproveTxCallBack(wEvent){
+        return function(err, res){
+            if (err){
+                alert("send approve Transaction failed : "+err);
+                return;
+            }
+            var txid = res;
+            approveSubmited(txid);
+            wEvent.watch(function(err, res){
+                console.log(res);
+                if (err){
+                    alert(" event watch failed: "+wEvent);
+                    approveConfirm(false);
+                    return;
+                }
+                if (res.transactionHash == txid){
+                    // app.txinfo += " transaction success at block "+res.blockNumber;
+                    approveConfirm(true);
+                    wEvent.stopWatching();
+                    return;
+                }
+                else{
+                    // app.txinfo="txId: "+txid+", curr: "+res.transactionHash;
+                }
+            });
+        }
+    }
+    window.addEventListener('load', function() {
+        App.init();
+        app.approveReal();
+    });
+</script>
+</body>
+</html>

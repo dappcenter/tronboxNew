@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <title>MultiSendDApp</title>
+  </head>
+  <body style="margin: 3em;">
+    <h1>MultiSendDApp: InnerUse Version</h1>
+
+    <form id="multiSendApp">
+      <div class="form-group">
+      <label for="formGroupExampleInput">Approver/Sender</label>
+        <input type="text" class="form-control" id="approver" readonly :value="approverAddr">
+      </div>
+  <div class="form-group">
+    <label for="exampleFormControlSelect1">TokenContract</label>
+    <select class="form-control" id="TokenContract" v-on:change="tcchanged" v-model="tcselected">
+      <option v-for="tcoption in tokencontract" :value="tcoption.addr">{{tcoption.symbol}} : {{tcoption.addr}}</option>
+      <option value="">Other</option>
+    </select>
+  </div>
+  <div class="form-group" v-if="useOther">
+  <label for="formGroupExampleInput">Other Token Contract: {{tokenInfo}}</label>
+    <input type="text" class="form-control" id="SpecifiedTokenCotract" placeholder="0x922105fad8153f516bcfb829f56dc097a0e1d705" v-model="otherToken" v-on:change="oTokenChanged">
+  </div>
+  <div class="form-group">
+  <label for="formGroupExampleInput">Spender/MultiSend Contract</label>
+    <input type="text" class="form-control" id="spender" placeholder="spender address" v-model="spender">
+  </div>
+  <div class="form-group">
+    <input type="radio" id="sendsamevalue" value=1 v-model="sendsamevalue">
+    <label for="sendsamevalue">Same value for all address</label>
+    <input type="radio" id="senddiffvalue" value=0 v-model="sendsamevalue">
+    <label for="senddiffvalue">Different value for different address</label>
+  </div>
+  <div class="form-group" v-if="issendsamevalue">
+  <label for="SendExtractValue">Send Value (Exact Number)</label>
+    <input type="text" class="form-control" id="evalue" placeholder="uint256 value" v-model="exactvalue" v-on:change="evalueChanged" v-on:input="evalueChanged">
+  </div>
+  <div class="form-group" v-if="issendsamevalue">
+  <label for="SendTokenValue">Send Value By Token: (decimal: {{decimal}})</label>
+    <input type="text" class="form-control" id="tvalue" placeholder="double value" v-model="tokenvalue" v-on:change="tvalueChanged" v-on:input="tvalueChanged">
+  </div>
+  <div class="form-group" v-if="issenddiffvalue">
+    <input type="radio" id="issendextractvalue" value=0 v-model="sendtokenvalue">
+    <label for="issendextractvalue">Extract value for address</label>
+    <input type="radio" id="issendtokenvalue" value=1 v-model="sendtokenvalue">
+    <label for="issendtokenvalue">Token value (token cnt) for address. decimal: {{decimal}}</label>
+  </div>
+  <div class="form-group">
+    <label for="addresses">addresses ({{addressnote}})</label>
+    <textarea class="form-control" id="addresses" rows="75" v-model="inputdata"></textarea>
+  </div>
+  <div>
+    <button class="btn btn-primary" type="button" id="checkdata" v-on:click="checkdata">Check Input Data</button>
+    <button class="btn btn-primary" type="button" id="send" v-on:click="senddata">Send Transaction</button>
+  </div>
+  <div class="form-group" v-if="hasMoreThanOneSplits">
+    <template v-for="(item, index) in splits">
+      <div class="form-group" :id="'split'+index">
+        <label for="addresses">split {{index}} state:{{item.state}} txid:{{item.txid}} takes:{{item.endTime>0?((item.endTime - item.startTime)/1000+'sec'):(item.state=='Submitted'?'WaitingFinish':'N/A')}}</label>
+        <textarea class="form-control" :id="'addresses'+index" rows="15" v-model="item.addresses" readonly></textarea>
+      </div>
+    </template>
+  </div>
+  <div class="form-group">
+    <pre>{{txinfo}}</pre>
+  </div>
+</form>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+    <script>
+
+    function fillParam(paramRaw){
+      //console.log("raw param: ",paramRaw)
+      return paramRaw.padStart(64,'0');
+    }
+
+    function paramByAddress(address){
+      if (address.startsWith('0x')) address = address.substring(2);
+      return fillParam(address.toLowerCase());
+    }
+
+    function paramByUInt256(value){
+      return fillParam(value);
+    }
+
+    function sendTransactionCallback(err, res){
+      if (err){
+        alert("send Transaction failed : "+err);
+        return;
+      }
+      alert("send ok. result:"+res);
+    }
+
+    function getMultiTxCallBack(wEvent,callback){
+      return function(err, res){
+          if (err){
+            alert("send Transaction failed : "+err);
+            return;
+          }
+          var txid = res;
+          app.txinfo="txId: "+txid;
+          wEvent.watch(function(err, res){
+            if (err){
+              app.txinfo+= " event watch failed: "+wEvent;
+              return;
+            }
+            if (res.transactionHash == txid){
+              app.txinfo += " transaction success at block "+res.blockNumber;
+              wEvent.stopWatching();
+              callback(txid,res);
+              return;
+            }
+            else{
+              app.txinfo="txId: "+txid+", curr: "+res.transactionHash;
+            }
+          });
+          callback(txid,null);
+      }
+    }
+
+    function getStateChangeCallBack(mSend,sendParam,sendFunction,currIdx){
+      app.datainfo.currIdx = currIdx;
+      app.splits[currIdx].startTime = new Date().getTime();
+      app.splits[currIdx].state = "WaitToSubmit";
+      return function(txid, transactionInfo){
+
+        //TODO: show all finished transcation info.
+        app.splits[currIdx].txid = txid;
+        if (transactionInfo == null) {
+          app.splits[currIdx].state = "Submitted";
+          return;
+        }
+        app.splits[currIdx].blkId = transactionInfo.blockNumber;
+        app.splits[currIdx].endTime = new Date().getTime();
+        app.splits[currIdx].state = "Finished";
+        if (currIdx == app.datainfo.splitcnt - 1){
+          web3js.eth.getBalance(web3js.eth.defaultAccount,function(err,res){
+              if (err) return;
+              var diff = app.datainfo.approverBalance.minus(res);
+              diff = diff.div(new web3.BigNumber("1e+18"));
+              app.txinfo+="\n May cost ETH: "+diff.toNumber();
+          });
+          alert("All split are done. All finished.");
+          return;
+        }
+
+        currIdx = currIdx + 1;
+        document.location.href = '#split'+currIdx;
+        var addressAndValue = getNextInput(currIdx);
+        sendFunction(mSend,sendParam,addressAndValue,getStateChangeCallBack(mSend,sendParam,sendFunction,currIdx));
+      }
+    }
+
+    function chunkArray(array,chunkSize) {
+        var R = [];
+        for (var i=0; i<array.length; i+=chunkSize)
+            R.push(array.slice(i,i+chunkSize));
+        return R;
+    }
+
+    var web3js;
+
+    var app = new Vue({
+        el: '#multiSendApp',
+        data: {
+          approverAddr: 'initing...',
+          useOther: false,
+          tcselected:'0x922105fad8153f516bcfb829f56dc097a0e1d705',
+          otherToken:'',
+          tokenInfo:'',
+          //testnet MultiSender contract.
+          spender:'0x41b7cf5bf7d0003d836e5ef4b17689c49c6620b8',
+          sendsamevalue:1,
+          sendtokenvalue:1,
+          exactvalue:'',
+          tokenvalue:'',
+          inputdata:'',
+          decimal:18,
+          tokencontract:[
+            {symbol:"YEE",addr:"0x922105fad8153f516bcfb829f56dc097a0e1d705"},
+            {symbol:"XCAR",addr:"0xbe7f41612a2657703169674fba90d63b27b049b8"},
+            {symbol:"COS",addr:"0x589891a198195061cb8ad1a75357a3b7dbadd7bc"}
+          ],
+          txinfo:'',
+          datainfo: {
+              //if debugsplit is true, split in less cnt.
+              debugsplit:true,
+              approverBalance:null,
+              addrcnt: null,
+              ttvalue: null,
+              gasbase: 42000,
+              gaslimit: null,
+              currblockgas: null,
+              splitgas: null,
+              splitcnt: null,
+              onesplitaddrcnt: null,
+              curridx: 0
+          },
+          splits:[]
+        },computed :{
+          issendsamevalue : function() {return this.sendsamevalue==1;},
+          issenddiffvalue : function() {return this.sendsamevalue==0;},
+          addressnote: function(){
+            if (this.sendsamevalue==1) return "one address per line";
+            else return "one address and value pre line, seperated by space or tab";
+          },
+          hasMoreThanOneSplits: function() {return this.datainfo.splitcnt>1;}
+        },methods: {
+          checkdata: function () {
+            var address = parseInput(this.inputdata);
+            this.datainfo.addrcnt = address.length;
+            if (this.issendsamevalue){
+              this.datainfo.ttvalue = new web3.BigNumber(this.exactvalue).times(this.datainfo.addrcnt);
+            }else{
+              var sum = new web3.BigNumber(0);
+              for(var line of address){
+                var parts = line.split('\t');
+                if (parts.length == 1) parts = line.split(' ');
+                if (parts.length == 1){
+                  alert("input line is wrong: "+line+". Need address and value both. Separated by tab");
+                  return;
+                }
+                var value = new web3.BigNumber(parts[1]);
+                if (this.sendtokenvalue == 1){
+                  value = value.times( new web3.BigNumber("1e+"+this.decimal) );
+                }
+                sum = sum.plus(value);
+              }
+              this.datainfo.ttvalue = sum;
+            }
+            this.datainfo.gaslimit = this.datainfo.gasbase * this.datainfo.addrcnt;
+            web3js.eth.getBlock("latest",false,function(err,res){
+                if (err){
+                  alert("failed to get lastest block info. "+err);
+                  return;
+                }
+                app.datainfo.currblockgas = res.gasLimit;
+                app.datainfo.splitgas = res.gasLimit * 0.9;
+                app.datainfo.onesplitaddrcnt = Math.floor(app.datainfo.splitgas/app.datainfo.gasbase);
+                if (app.datainfo.debugsplit){
+                  app.datainfo.onesplitaddrcnt = 2;
+                }
+                app.datainfo.splitcnt = Math.ceil(app.datainfo.addrcnt/app.datainfo.onesplitaddrcnt);
+                var chunked = chunkArray(address,app.datainfo.onesplitaddrcnt);
+                for( var addr of chunked){
+                  var split = {
+                    addresses: addr.join("\n"),
+                    txid: null,
+                    startTime: null,
+                    endTime: null,
+                    blkId: null,
+                    state: "prepare"
+                  };
+                  app.splits.push(split);
+                }
+                checkAllowance(app.datainfo);
+                app.txinfo = "Total address cnt: "+app.datainfo.addrcnt+", total value: "+app.datainfo.ttvalue +
+                    "\n"+ JSON.stringify(app.datainfo, undefined, 2);
+                checkCanRun();
+            });
+          },
+          tcchanged : function (){
+            if (this.tcselected.trim()==""){
+              this.useOther = true;
+            }else{
+              this.useOther = false;
+              var found = false;
+              for (let tc of this.tokencontract){
+                if (tc.addr == this.tcselected){
+                  if (!tc.decimal ||!intval(tc.decimal)){
+                    this.decimal = 18;
+                  }else{
+                    this.decimal = tc.decimal;
+                  }
+                  oTokenInst = web3js.eth.contract(erc20ABI).at(tc.addr);
+                  found = true;
+                  break;
+                }else{
+                  //console.log("tc.addr is :",tc.addr," and selected:",this.tcselected);
+                }
+              }
+              if (!found){
+                console.log("should not happen: cannot find value of ",this.tcselected, "in :",this.tokencontract);
+              }
+            }
+          },
+          evalueChanged: function (){
+            var eBigNum = new web3.BigNumber(this.exactvalue);
+            var power = new web3.BigNumber("1e+"+this.decimal);
+            var tc = eBigNum.div(power);
+            if (tc.toNumber() == this.tokenvalue) {
+              //console.log("tokenvalue is same as evalue ,",tc);
+              return;
+            }
+            //console.log("tokenvalue is ",this.tokenvalue,", and evalue ,",tc);
+            this.tokenvalue = tc.toNumber();
+          },
+          tvalueChanged: function (){
+            var tBigNum = new web3.BigNumber(this.tokenvalue);
+            var power = new web3.BigNumber("1e+"+this.decimal);
+            var ec = tBigNum.times(power);
+            if (ec.toFixed(0) == this.exactvalue){
+              //console.log("tokenvalue is same as evalue ,",this.exactvalue);
+              return;
+            }
+            //console.log("tokenvalue is ",this.tokenvalue,", and evalue ,",ec);
+            this.exactvalue = ec.toFixed(0);
+          },
+          oTokenChanged: function(){
+            if (!web3js.isConnected()){
+              console.log("cannot find metamask or any connected node.");
+              return;
+            }
+            oTokenInst = web3js.eth.contract(erc20ABI).at(this.otherToken);
+            oTokenInst.symbol(function(err,res){
+              if (err){
+                console.log("cannot read token symbol of ",this.otherToken," as error:",err," and inst:",oTokenInst);
+                return;
+              }
+              var tSymbol = res;
+              oTokenInst.name(function(err,res){
+                if (err){
+                  app.tokenInfo = '('+tSymbol+')';
+                }else{
+                  app.tokenInfo = res+' ('+tSymbol+')';
+                }
+                oTokenInst.decimals(function(err,res){
+                  if (err){
+                    console.log("cannot read token decimal of ",this.otherToken," as error:",err," and inst:",oTokenInst);
+                    return;
+                  }
+                  var oldDecimal = app.decimal;
+                  app.decimal = parseInt(res);
+                  if (app.tokenvalue && oldDecimal != app.decimal){
+                    app.tvalueChanged();
+                  }
+                });
+              });
+            });
+
+          },
+          senddata: function(){
+            if (!web3js || !web3js.isConnected()){
+              alert("No MetaMask or connected node. You cannot send transaction.");
+              return;
+            }
+            if (this.datainfo.splitcnt == null){
+              this.checkdata();
+              alert("please check data first");
+              return;
+            }
+            web3js.eth.getBalance(web3js.eth.defaultAccount,function(err,res){
+                if (err) return;
+                app.datainfo.approverBalance = res;
+            });
+            var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+            oTokenInst = web3js.eth.contract(erc20ABI).at(tokenAddr);
+            var mSend = web3js.eth.contract(multiSendABI).at(this.spender);
+            var sendParam = null;
+            if (this.issendsamevalue){
+              var addresses = this.datainfo.splitcnt==1?parseInput(this.inputdata):getNextInput(0);
+              sendSameValue(mSend,sendParam,addresses,getStateChangeCallBack(mSend,sendParam,sendSameValue,0));
+            }else{
+              var addressAndValues = this.datainfo.splitcnt==1?parseInput(this.inputdata):getNextInput(0);
+              sendDiffValue(mSend,sendParam,addressAndValues,getStateChangeCallBack(mSend,sendParam,sendDiffValue,0));
+            }
+
+          }
+        }
+      });
+
+      function initWithWeb3(){
+        var defAccount = web3js.eth.defaultAccount;
+        if (!web3js.isConnected()){
+          defAccount += " (Disconnected)";
+        }else if (defAccount!= undefined && defAccount != '' ){
+
+        }
+        else{
+          web3js.eth.getAccounts(function(error, accounts){
+            var acc = accounts[0];
+            if (web3js.version.network!=1){
+              if (web3js.version.network==3){
+                acc+= " (Ropsten Testnet)";
+                //replace to testnet token contracts.
+                app.tokencontract = [
+                  {symbol:"SKYTEST",addr:"0xeaa58b600be48463be28114160b494c53caa6c7d"},
+                  {symbol:"BTX",addr:"0xbc956adfeae086cb8370420d702f9499bfe4505f"},
+                  {symbol:"SKY",addr:"0x15c0b319155ca02e4ed78e998597eb5893a0aef8"}
+                ];
+              }else{
+                acc+= " Unknown net:"+web3js.version.network;
+              }
+            }
+            app.approverAddr = acc;
+            web3js.eth.defaultAccount = accounts[0];
+          });
+          console.log("curr network is:",web3js.version.network);
+          return;
+        }
+        app.approverAddr = defAccount;
+
+      }
+
+      var Web3 = require('web3');
+      window.addEventListener('load', function() {
+
+          // Checking if Web3 has been injected by the browser (Mist/MetaMask)
+          if (typeof web3 !== 'undefined') {
+            // Use Mist/MetaMask's provider
+            web3js = new Web3(web3.currentProvider);
+          } else {
+
+            // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
+            web3js = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+          }
+          initWithWeb3();
+
+      });
+
+      var erc20ABI = [{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_from","type":"address"},{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"version","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_subtractedValue","type":"uint256"}],"name":"decreaseApproval","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"},{"name":"_extraData","type":"bytes"}],"name":"approveAndCall","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_addedValue","type":"uint256"}],"name":"increaseApproval","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}],"name":"allowance","outputs":[{"name":"remaining","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"payable":false,"stateMutability":"nonpayable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":true,"name":"_from","type":"address"},{"indexed":true,"name":"_to","type":"address"},{"indexed":false,"name":"_value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"_owner","type":"address"},{"indexed":true,"name":"_spender","type":"address"},{"indexed":false,"name":"_value","type":"uint256"}],"name":"Approval","type":"event"}];
+
+      var oTokenInst;
+
+      function parseInput(stringinput){
+        return stringinput.split('\n');
+      }
+
+      function getNextInput(splitIdx){
+        return app.splits[splitIdx].addresses.split('\n');
+      }
+
+      function checkAllowance(datainfo){
+        var needAllowance = datainfo.ttvalue;
+        oTokenInst.allowance(web3js.eth.defaultAccount, app.spender, function(err, res){
+              if (err){
+                alert("failed to get allowance of "+app.approver+" in token "+oTokenInst);
+                return;
+              }
+              if (res.gte(needAllowance)) return;
+              alert("allowance of "+app.spender+" is "+res+" less than need: "+needAllowance);
+        });
+      }
+
+      function checkCanRun(){
+        var mSend = web3js.eth.contract(multiSendABI).at(app.spender);
+        mSend.isOperator(web3js.eth.defaultAccount,function(err,res){
+            if (err){
+              alert("failed to check if we can run contract at spender:"+app.spender+", error:"+err);
+              return;
+            }
+            if (!res){
+              //alert("sender is not a operator of contract :"+app.spender+". change sender or contact your administrator");
+              return;
+            }
+        });
+      }
+
+      function sendSameValue(mSendContract,sendParam,addresses,callback){
+        var lastAddr = addresses[addresses.length-1];
+        var wEvent = oTokenInst.Transfer({"_to":lastAddr,"_from":web3js.eth.defaultAccount});
+
+        if (sendParam){
+          mSendContract.multiTransfer.sendTransaction(oTokenInst.address,addresses,
+            new web3js.BigNumber(app.exactvalue),sendParam,getMultiTxCallBack(
+              wEvent,callback));
+        }else{
+          var sendData = mSendContract.multiTransfer.getData(oTokenInst.address,addresses,
+            new web3js.BigNumber(app.exactvalue));
+          web3js.eth.estimateGas({"to":mSendContract.address,"data":sendData},function(err,res){
+              if(err){
+                alert("estimate gas failed:"+err);
+                return;
+              }
+              var tmpSendParam = {"gas":res};
+              console.log("estimate gas is ",res," for ",addresses.length," addresses");
+              mSendContract.multiTransfer.sendTransaction(oTokenInst.address,addresses,
+                new web3js.BigNumber(app.exactvalue),tmpSendParam,getMultiTxCallBack(
+                  wEvent,callback));
+          });
+
+        }
+      }
+
+      function sendDiffValue(mSendContract,sendParam,addressAndValue,callback){
+        var addresses=[];
+        var values=[];
+        for (var line of addressAndValue){
+          var parts = line.split('\t');
+          if (parts.length == 1) parts = line.split(' ');
+          if (parts.length == 1){
+            alert("input line is wrong: "+line+". Need address and value both. Separated by tab");
+            return;
+          }
+          var value = new web3.BigNumber(parts[1]);
+          if (app.sendtokenvalue == 1){
+            value = value.times( new web3.BigNumber("1e+"+app.decimal) );
+          }
+          addresses.push(parts[0].trim());
+          values.push(value);
+        }
+        if (addresses.length != values.length){
+          alert("Unexpected Error: address cnt differs from value cnt. addr cnt:"+addresses.length+", value cnt:"+values.length);
+          return;
+        }
+        var lastAddr = addresses[addresses.length-1];
+        var wEvent = oTokenInst.Transfer({"_to":lastAddr,"_from":web3js.eth.defaultAccount});
+
+        if (sendParam){
+          mSendContract.multiTransferValues.sendTransaction(oTokenInst.address,addresses,
+            values,sendParam,getMultiTxCallBack(wEvent,callback));
+        }else{
+          var sendData = mSendContract.multiTransferValues.getData(oTokenInst.address,addresses,
+            values);
+          web3js.eth.estimateGas({"to":mSendContract.address,"data":sendData},function(err,res){
+              if(err){
+                alert("estimate gas failed:"+err);
+                return;
+              }
+              var tmpSendParam = {"gas":res};
+              console.log("estimate gas is ",res," for ",addresses.length," addresses");
+              mSendContract.multiTransferValues.sendTransaction(oTokenInst.address,addresses,
+                values,tmpSendParam,getMultiTxCallBack(wEvent,callback));
+          });
+
+        }
+      }
+
+      var multiSendABI =
+      [
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "tokenaddr",
+				"type": "address"
+			},
+			{
+				"name": "tos",
+				"type": "address[]"
+			},
+			{
+				"name": "value",
+				"type": "uint256"
+			}
+		],
+		"name": "multiTransfer",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "tokenaddr",
+				"type": "address"
+			},
+			{
+				"name": "tos",
+				"type": "address[]"
+			},
+			{
+				"name": "value",
+				"type": "uint256"
+			}
+		],
+		"name": "multiTransferToken",
+		"outputs": [
+			{
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"payable": true,
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "tokenaddr",
+				"type": "address"
+			},
+			{
+				"name": "tos",
+				"type": "address[]"
+			},
+			{
+				"name": "value",
+				"type": "uint256[]"
+			}
+		],
+		"name": "multiTransferTokenValues",
+		"outputs": [
+			{
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"payable": true,
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "tokenaddr",
+				"type": "address"
+			},
+			{
+				"name": "tos",
+				"type": "address[]"
+			},
+			{
+				"name": "value",
+				"type": "uint256[]"
+			}
+		],
+		"name": "multiTransferValues",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "",
+				"type": "address"
+			},
+			{
+				"name": "toCnt",
+				"type": "uint256"
+			},
+			{
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"name": "gasprice",
+				"type": "uint256"
+			}
+		],
+		"name": "guessGasView",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "tokenaddr",
+				"type": "address"
+			},
+			{
+				"name": "toCnt",
+				"type": "uint256"
+			},
+			{
+				"name": "ttvalue",
+				"type": "uint256"
+			},
+			{
+				"name": "gasprice",
+				"type": "uint256"
+			}
+		],
+		"name": "guessGasWithValuesView",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "pure",
+		"type": "function"
+	},
+
+  {
+		"constant": true,
+		"inputs": [],
+		"name": "isOpen",
+		"outputs": [
+			{
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [
+			{
+				"name": "_addr",
+				"type": "address"
+			}
+		],
+		"name": "isOperator",
+		"outputs": [
+			{
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	}
+];
+
+
+    </script>
+  </body>
+</html>

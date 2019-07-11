@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <title>Approve</title>
+  </head>
+  <body style="margin: 3em;">
+    <h1>Approve Generator</h1>
+
+    <form id="approverApp">
+      <div class="form-group">
+      <label for="formGroupExampleInput">Approver</label>
+        <input type="text" class="form-control" id="approver" readonly :value="approverAddr">
+      </div>
+  <div class="form-group">
+    <label for="exampleFormControlSelect1">TokenContract</label>
+    <select class="form-control" id="TokenContract" v-on:change="tcchanged" v-model="tcselected">
+      <option v-for="tcoption in tokencontract" :value="tcoption.addr">{{tcoption.symbol}} : {{tcoption.addr}}</option>
+      <option value="">Other</option>
+    </select>
+  </div>
+  <div class="form-group" v-if="useOther">
+  <label for="formGroupExampleInput">Other Token Contract: {{tokenInfo}}</label>
+    <input type="text" class="form-control" id="SpecifiedTokenCotract" placeholder="0x922105fad8153f516bcfb829f56dc097a0e1d705" v-model="otherToken" v-on:change="oTokenChanged">
+  </div>
+  <div class="form-group">
+  <label for="formGroupExampleInput">Spender</label>
+    <input type="text" class="form-control" id="spender" placeholder="spender address" v-model="spender">
+  </div>
+  <div class="form-group">
+  <label for="formGroupExampleInput">Approve Value (Exact Number)</label>
+    <input type="text" class="form-control" id="value" placeholder="uint256 value" v-model="exactvalue" v-on:change="evalueChanged" v-on:input="evalueChanged">
+  </div>
+  <div class="form-group">
+  <label for="formGroupExampleInput">Approve Value By Token: (decimal: {{decimal}})</label>
+    <input type="text" class="form-control" id="value" placeholder="double value" v-model="tokenvalue" v-on:change="tvalueChanged" v-on:input="tvalueChanged">
+  </div>
+  <div class="form-group">
+    <label for="exampleFormControlTextarea1">Input Data</label>
+    <textarea class="form-control" id="exampleFormControlTextarea1" rows="3">{{inputdata}}</textarea>
+  </div>
+  <button class="btn btn-primary" type="button" id="makedata" v-on:click="generatedata">Generate Input Data</button>
+  <button class="btn btn-primary" type="button" id="send" v-on:click="senddata">Send Transaction</button>
+  <div class="form-group">
+    <label>{{txinfo}}</label>
+  </div>
+</form>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+    <script>
+
+    function fillParam(paramRaw){
+      //console.log("raw param: ",paramRaw)
+      return paramRaw.padStart(64,'0');
+    }
+
+    function paramByAddress(address){
+      if (address.startsWith('0x')) address = address.substring(2);
+      return fillParam(address.toLowerCase());
+    }
+
+    function paramByUInt256(value){
+      return fillParam(value);
+    }
+
+    function sendTransactionCallback(err, res){
+      if (err){
+        alert("send Transaction failed : "+err);
+        return;
+      }
+      alert("send ok. result:"+res);
+    }
+
+    function getTxCallBack(wEvent){
+      return function(err, res){
+          if (err){
+            alert("send Transaction failed : "+err);
+            return;
+          }
+          var txid = res;
+          app.txinfo="txId: "+txid;
+          wEvent.watch(function(err, res){
+            if (err){
+              app.txinfo+= " event watch failed: "+wEvent;
+              return;
+            }
+            if (res.transactionHash == txid){
+              app.txinfo += " transaction success at block "+res.blockNumber;
+              wEvent.stopWatching();
+              return;
+            }
+            else{
+              app.txinfo="txId: "+txid+", curr: "+res.transactionHash;
+            }
+          });
+      }
+    }
+
+    var web3js;
+
+    var app = new Vue({
+        el: '#approverApp',
+        data: {
+          approverAddr: 'initing...',
+          useOther: false,
+          tcselected:'0x922105fad8153f516bcfb829f56dc097a0e1d705',
+          otherToken:'',
+          tokenInfo:'',
+          //testnet MultiSender contract.
+          spender:'0x41b7cf5bf7d0003d836e5ef4b17689c49c6620b8',
+          //mainnet main outaddr.
+          //  spender:'0xf9978024e59a119a9a410eba9d83981b52edd320',
+          exactvalue:'',
+          tokenvalue:'',
+          inputdata:'',
+          decimal:18,
+          tokencontract:[
+            {symbol:"YEE",addr:"0x922105fad8153f516bcfb829f56dc097a0e1d705"},
+            {symbol:"XCAR",addr:"0xbe7f41612a2657703169674fba90d63b27b049b8"},
+            {symbol:"COS",addr:"0x589891a198195061cb8ad1a75357a3b7dbadd7bc"}
+          ],
+          txinfo:''
+        },
+        methods: {
+          generatedata: function () {
+            var approveHash = '0x095ea7b3';
+            var param1 = paramByAddress(this.spender);
+            var param2 = paramByUInt256(this.exactvalue);
+            this.inputdata = approveHash+param1+param2;
+          },
+          tcchanged : function (){
+            if (this.tcselected.trim()==""){
+              this.useOther = true;
+            }else{
+              this.useOther = false;
+              var found = false;
+              for (let tc of this.tokencontract){
+                if (tc.addr == this.tcselected){
+                  if (!tc.decimal ||!intval(tc.decimal)){
+                    this.decimal = 18;
+                  }else{
+                    this.decimal = tc.decimal;
+                  }
+                  found = true;
+                  break;
+                }else{
+                  //console.log("tc.addr is :",tc.addr," and selected:",this.tcselected);
+                }
+              }
+              if (!found){
+                console.log("should not happen: cannot find value of ",this.tcselected, "in :",this.tokencontract);
+              }
+            }
+          },
+          evalueChanged: function (){
+            var eBigNum = new web3.BigNumber(this.exactvalue);
+            var power = new web3.BigNumber("1e+"+this.decimal);
+            var tc = eBigNum.div(power);
+            if (tc.toNumber() == this.tokenvalue) {
+              //console.log("tokenvalue is same as evalue ,",tc);
+              return;
+            }
+            //console.log("tokenvalue is ",this.tokenvalue,", and evalue ,",tc);
+            this.tokenvalue = tc.toNumber();
+          },
+          tvalueChanged: function (){
+            var tBigNum = new web3.BigNumber(this.tokenvalue);
+            var power = new web3.BigNumber("1e+"+this.decimal);
+            var ec = tBigNum.times(power);
+            if (ec.toFixed(0) == this.exactvalue){
+              //console.log("tokenvalue is same as evalue ,",this.exactvalue);
+              return;
+            }
+            //console.log("tokenvalue is ",this.tokenvalue,", and evalue ,",ec);
+            this.exactvalue = ec.toFixed(0);
+          },
+          oTokenChanged: function(){
+            if (!web3js.isConnected()){
+              console.log("cannot find metamask or any connected node.");
+              return;
+            }
+            oTokenInst = web3js.eth.contract(erc20ABI).at(this.otherToken);
+            oTokenInst.symbol(function(err,res){
+              if (err){
+                console.log("cannot read token symbol of ",this.otherToken," as error:",err," and inst:",oTokenInst);
+                return;
+              }
+              var tSymbol = res;
+              oTokenInst.name(function(err,res){
+                if (err){
+                  app.tokenInfo = '('+tSymbol+')';
+                }else{
+                  app.tokenInfo = res+' ('+tSymbol+')';
+                }
+                oTokenInst.decimals(function(err,res){
+                  if (err){
+                    console.log("cannot read token decimal of ",this.otherToken," as error:",err," and inst:",oTokenInst);
+                    return;
+                  }
+                  var oldDecimal = app.decimal;
+                  app.decimal = parseInt(res);
+                  if (app.tokenvalue && oldDecimal != app.decimal){
+                    app.tvalueChanged();
+                  }
+                });
+              });
+            });
+
+          },
+          senddata: function(){
+            if (!web3js || !web3js.isConnected()){
+              alert("No MetaMask or connected node. You cannot send transaction.");
+              return;
+            }
+            var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+            oTokenInst = web3js.eth.contract(erc20ABI).at(tokenAddr);
+            var sendParam = null;
+            var wEvent = oTokenInst.Approval({"_spender":this.spender,"_owner":web3js.eth.defaultAccount});
+            if (sendParam){
+              oTokenInst.approve.sendTransaction(this.spender,this.exactvalue,sendParam,getTxCallBack(wEvent));
+            }else{
+              oTokenInst.approve.sendTransaction(this.spender,new web3js.BigNumber(this.exactvalue),getTxCallBack(wEvent));
+            }
+          }
+        }
+      });
+
+      function initWithWeb3(){
+        var defAccount = web3js.eth.defaultAccount;
+        if (!web3js.isConnected()){
+          defAccount += " (Disconnected)";
+        }else if (defAccount!= undefined && defAccount != '' ){
+
+        }
+        else{
+          web3.eth.getAccounts(function(error, accounts){
+            var acc = accounts[0];
+            if (web3js.version.network!=1){
+              if (web3js.version.network==3){
+                acc+= " (Ropsten Testnet)";
+                //replace to testnet token contracts.
+                app.tokencontract = [
+                  {symbol:"SKYTEST",addr:"0xeaa58b600be48463be28114160b494c53caa6c7d"},
+                  {symbol:"BTX",addr:"0xbc956adfeae086cb8370420d702f9499bfe4505f"},
+                  {symbol:"SKY",addr:"0x15c0b319155ca02e4ed78e998597eb5893a0aef8"}
+                ];
+              }else{
+                acc+= " Unknown net:"+web3js.version.network;
+              }
+            }
+            app.approverAddr = acc;
+            web3js.eth.defaultAccount = accounts[0];
+          });
+          console.log("curr network is:",web3js.version.network);
+          return;
+        }
+        app.approverAddr = defAccount;
+
+      }
+
+      var Web3 = require('web3');
+      window.addEventListener('load', function() {
+
+          // Checking if Web3 has been injected by the browser (Mist/MetaMask)
+          if (typeof web3 !== 'undefined') {
+            // Use Mist/MetaMask's provider
+            web3js = new Web3(web3.currentProvider);
+          } else {
+
+            // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
+            web3js = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+          }
+          initWithWeb3();
+
+      });
+
+      var erc20ABI = [{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_from","type":"address"},{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"version","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_subtractedValue","type":"uint256"}],"name":"decreaseApproval","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"},{"name":"_extraData","type":"bytes"}],"name":"approveAndCall","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_addedValue","type":"uint256"}],"name":"increaseApproval","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}],"name":"allowance","outputs":[{"name":"remaining","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"payable":false,"stateMutability":"nonpayable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":true,"name":"_from","type":"address"},{"indexed":true,"name":"_to","type":"address"},{"indexed":false,"name":"_value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"_owner","type":"address"},{"indexed":true,"name":"_spender","type":"address"},{"indexed":false,"name":"_value","type":"uint256"}],"name":"Approval","type":"event"}];
+
+      var oTokenInst;
+    </script>
+  </body>
+</html>

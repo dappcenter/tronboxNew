@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <title>世界纪录</title>
+  </head>
+  <body style="margin: 3em;">
+    <h1>Record And Award</h1>
+
+    <form id="voteApp">
+      <div class="form-group">
+      <label for="formGroupExampleInput">YourAddress</label>
+        <input type="text" class="form-control" id="operatorAddr" readonly :value="operatorAddr">
+      </div>
+  <div class="form-group">
+    <label for="exampleFormControlSelect1">VoteContract</label>
+    <select class="form-control" id="RecordContract" v-on:change="tcchanged" v-model="tcselected">
+      <option v-for="tcoption in tokencontract" :value="tcoption.addr">{{tcoption.symbol}} : {{tcoption.addr}}</option>
+      <option value="">Other</option>
+    </select>
+  </div>
+  <div class="form-group" v-if="useOther">
+  <label for="formGroupExampleInput">Other Token Contract: {{tokenInfo}}</label>
+    <input type="text" class="form-control" id="SpecifiedTokenCotract" placeholder="0x41d25c65e73d3d4b4f6732ed6dbf8f994b701182" v-model="otherToken" v-on:change="oTokenChanged">
+  </div>
+
+  <div class="form-group">
+  <label for="formGroupExampleInput">Name</label>
+    <input type="text" class="form-control" id="spender" placeholder="recordName string" v-model="rname">
+  </div>
+  <div class="form-group">
+  <label for="formGroupExampleInput">Value(数值)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordValue uint256" v-model="rvalue">
+  </div>
+  <div class="form-group">
+  <label for="formGroupExampleInput">Unit(单位)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordUnit string" v-model="runit">
+  </div>
+  <div class="form-group">
+    <label for="formGroupExampleInput">Remard(备注)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordRemark string" v-model="rremark">
+  </div>
+  <div class="form-group">
+    <label for="formGroupExampleInput">Pre(前一条)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordPre uint256" v-model="rpre">
+  </div>
+  <div class="form-group">
+    <label for="formGroupExampleInput">Later(后一条)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordUnit uint256" v-model="rlater">
+  </div>
+
+  <div class="form-group">
+    <label for="exampleFormControlTextarea1">{{inputdata}}</label>
+  </div>
+  <button class="btn btn-primary" type="button" id="send" v-on:click="createRecord">第一步创建记录</button>
+
+      <div class="form-group">
+        <label for="formGroupExampleInput">Owner</label>
+        <input type="text" class="form-control" id="spender" placeholder="owner address" v-model="owner">
+      </div>
+      <div class="form-group">
+        <label for="formGroupExampleInput">ChallengeName(挑战人姓名)</label>
+        <input type="text" class="form-control" id="value" placeholder="name string" v-model="challengename">
+      </div>
+      <div class="form-group">
+        <label for="formGroupExampleInput">ChallengeTime(挑战时间)</label>
+        <input type="text" class="form-control" id="value" placeholder="time uint256" v-model="challengetime">
+      </div>
+      <div class="form-group">
+        <label for="formGroupExampleInput">ChanllengeLocation(地点)</label>
+        <input type="text" class="form-control" id="value" placeholder="location string" v-model="challengelocation">
+      </div>
+      <div class="form-group">
+        <label for="formGroupExampleInput">VideoUri(视频信息)</label>
+        <input type="text" class="form-control" id="value" placeholder="videouri string" v-model="videouri">
+      </div>
+      <div class="form-group">
+        <label for="formGroupExampleInput">Remark(备注)</label>
+        <input type="text" class="form-control" id="value" placeholder="remark uint256" v-model="remark">
+      </div>
+
+
+      <div class="form-group">
+        <label for="exampleFormControlTextarea1">{{inputdata2}}</label>
+      </div>
+      <button class="btn btn-primary" type="button" id="send" v-on:click="awardAndCheck">第二步颁发证书</button>
+      </br></br></br></br>
+
+      <h2>************************************************************************************</h2>
+      </br>
+      <div class="form-group">
+        <label for="exampleFormControlTextarea1">当前地址最后一次所创建的记录ID</label>
+        <textarea class="form-control" id="exampleFormControlTextarea1" rows="1">{{inputdata5}}</textarea>
+        <button class="btn btn-primary" type="button" id="send" v-on:click="getLastRecordId">GetLastRecordId</button>
+      </div>
+      </br>
+      <h2>************************************************************************************</h2>
+      <div class="form-group">
+        <label for="exampleFormControlTextarea1">当前地址最后一次所创建的证书ID</label>
+        <textarea class="form-control" id="exampleFormControlTextarea1" rows="1">{{inputdata6}}</textarea>
+        <button class="btn btn-primary" type="button" id="send" v-on:click="getLastCertId">GetLastCertId</button>
+      </div>
+      </br>
+      <h2>************************************************************************************</h2>
+      </br>
+      <div class="form-group">
+        <label for="formGroupExampleInput">通过记录ID查询信息</label>
+        <input type="text" class="form-control" id="value" placeholder="recordId uint256" v-model="recordId">
+      </div>
+      <div class="form-group">
+        <label for="exampleFormControlTextarea1">recordInfo</label>
+        <textarea class="form-control" id="exampleFormControlTextarea1" rows="6">{{inputdata3}}</textarea>
+      </div>
+      <button class="btn btn-primary" type="button" id="send" v-on:click="getRecordById">GetRecordById</button>
+      </br>
+      <h2>************************************************************************************</h2>
+      </br>
+      <div class="form-group">
+        <label for="formGroupExampleInput">通过证书ID查询信息</label>
+        <input type="text" class="form-control" id="value" placeholder="certId uint256" v-model="certId">
+      </div>
+      <div class="form-group">
+        <label for="exampleFormControlTextarea1">certInfo</label>
+        <textarea class="form-control" id="exampleFormControlTextarea1" rows="6">{{inputdata4}}</textarea>
+      </div>
+      <button class="btn btn-primary" type="button" id="send" v-on:click="getCertById">GetCertById</button>
+</form>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+    <script>
+
+    function fillParam(paramRaw){
+      //console.log("raw param: ",paramRaw)
+      return paramRaw.padStart(64,'0');
+    }
+
+    function paramByAddress(address){
+      if (address.startsWith('0x')) address = address.substring(2);
+      return fillParam(address.toLowerCase());
+    }
+
+    function paramByUInt256(value){
+      return fillParam(value);
+    }
+
+    function sendTransactionCallback(err, res){
+      if (err){
+        alert("send Transaction failed : "+err);
+        return;
+      }
+      alert("send ok. result:"+res);
+    }
+
+    function getTxCallBack(wEvent){
+      return function(err, res){
+          if (err){
+            alert("send Transaction failed : "+err);
+            return;
+          }
+          var txid = res;
+          app.retxId = txid;
+          app.inputdata="txId: "+txid;
+      }
+    }
+    function getTxCallBack2(wEvent){
+        return function(err, res){
+            if (err){
+                alert("send Transaction failed : "+err);
+                return;
+            }
+            var txid = res;
+            app.retxId = txid;
+            app.inputdata2="txId: "+txid;
+        }
+    }
+
+    var web3js;
+
+    var app = new Vue({
+        el: '#voteApp',
+        data: {
+          operatorAddr: 'initing...',
+          useOther: false,
+          tcselected:'0x9c68969975afaa39cd2fbf68c490f296ede800d8',
+          otherToken:'',
+          tokenInfo:'',
+
+          rname:"",
+          rvalue:"",
+          runit:"",
+          rremark:"",
+          rpre:"",
+          rlater:"",
+          recordId:"",
+
+            owner:"",
+            challengename:"",
+            challengetime:"",
+            challengelocation:"",
+            videouri:"",
+            remark:"",
+            certid:"",
+            isAgree:"",
+            inputdata:'',
+            retxId:"",
+            inputdata2:'',
+            inputdata4:"",
+            certId:"",
+            retxId2:"",
+
+
+          inputdata:'',
+          inputdata3:"",
+          inputdata5:"",
+          inputdata6:"",
+          retxId:"",
+          tokencontract:[
+            {symbol:"WRVote",addr:"0x9c68969975afaa39cd2fbf68c490f296ede800d8"}
+          ]
+        },
+        methods: {
+          tcchanged : function (){
+            if (this.tcselected.trim()==""){
+              this.useOther = true;
+            }else{
+              this.useOther = false;
+            }
+          },
+          oTokenChanged: function(){
+            if (!web3js.isConnected()){
+              console.log("cannot find metamask or any connected node.");
+              return;
+            }
+            oTokenInst = web3js.eth.contract(voteABI).at(this.otherToken);
+          },
+            createRecord: function(){
+            if (!web3js || !web3js.isConnected()){
+              alert("No MetaMask or connected node. You cannot send transaction.");
+              return;
+            }
+            var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+            oTokenInst = web3js.eth.contract(voteABI).at(tokenAddr);
+            var sendParam = null;
+            if (sendParam){
+              oTokenInst.newRecord.sendTransaction(this.rname,this.rvalue, this.runit, this.rremark, new web3js.BigNumber(this.rpre),new web3js.BigNumber(this.rlater),sendParam,getTxCallBack(null));
+            }else{
+              oTokenInst.newRecord.sendTransaction(this.rname,this.rvalue, this.runit, this.rremark, new web3js.BigNumber(this.rpre),new web3js.BigNumber(this.rlater),getTxCallBack(null));
+            }
+          },
+          getRecordById: function(){
+            if (!web3js || !web3js.isConnected()){
+              alert("No MetaMask or connected node. You cannot send transaction.");
+              return;
+            }
+            var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+            oTokenInst = web3js.eth.contract(voteABI).at(tokenAddr);
+            oTokenInst.getNowRecord(new web3js.BigNumber(app.recordId), function(err,res){
+              if (err){
+                  alert(err);
+                return;
+              }
+              console.log(res);
+              app.inputdata3 = res;
+            });
+          },
+            awardAndCheck: function(){
+                if (!web3js || !web3js.isConnected()){
+                    alert("No MetaMask or connected node. You cannot send transaction.");
+                    return;
+                }
+                console.log(web3js);
+                var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+                oTokenInst = web3js.eth.contract(voteABI).at(tokenAddr);
+                var sendParam = null;
+                if (sendParam){
+                    oTokenInst.awardAndCheck.sendTransaction(this.owner,this.challengename, new web3js.BigNumber(this.challengetime), this.challengelocation, this.videouri, this.remark,sendParam,getTxCallBack2(null));
+                }else{
+                    oTokenInst.awardAndCheck.sendTransaction(this.owner,this.challengename, new web3js.BigNumber(this.challengetime), this.challengelocation, this.videouri, this.remark,getTxCallBack2(null));
+                }
+            },
+            getCertById: function(){
+                if (!web3js || !web3js.isConnected()){
+                    alert("No MetaMask or connected node. You cannot send transaction.");
+                    return;
+                }
+                var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+                oTokenInst = web3js.eth.contract(voteABI).at(tokenAddr);
+                oTokenInst.getCertificateInfo(new web3js.BigNumber(app.certId), function(err,res){
+                    if (err){
+                        alert(err);
+                        return;
+                    }
+                    console.log(res);
+                    app.inputdata4 = res;
+                });
+            },
+            getLastCertId: function(){
+                if (!web3js || !web3js.isConnected()){
+                    alert("No MetaMask or connected node. You cannot send transaction.");
+                    return;
+                }
+                var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+                oTokenInst = web3js.eth.contract(voteABI).at(tokenAddr);
+                oTokenInst.lastCreateCert(web3js.eth.defaultAccount, function(err,res){
+                    if (err){
+                        alert(err);
+                        return;
+                    }
+                    console.log(res);
+                    app.inputdata6 = res;
+                });
+            },
+            getLastRecordId: function(){
+                if (!web3js || !web3js.isConnected()){
+                    alert("No MetaMask or connected node. You cannot send transaction.");
+                    return;
+                }
+                var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+                oTokenInst = web3js.eth.contract(voteABI).at(tokenAddr);
+                oTokenInst.lastCreateRecord(web3js.eth.defaultAccount, function(err,res){
+                    if (err){
+                        alert(err);
+                        return;
+                    }
+                    console.log(res);
+                    app.inputdata5 = res;
+                });
+            }
+        }
+      });
+
+
+
+      function initWithWeb3(){
+        var defAccount = web3js.eth.defaultAccount;
+        if (!web3js.isConnected()){
+          defAccount += " (Disconnected)";
+        }else if (defAccount!= undefined && defAccount != '' ){
+
+        }
+        else{
+          web3.eth.getAccounts(function(error, accounts){
+            var acc = accounts[0];
+            if (web3js.version.network!=1){
+              if (web3js.version.network==3){
+                acc+= " (Ropsten Testnet)";
+                //replace to testnet token contracts.
+                // app.tokencontract = [
+                //   {symbol:"SKYTEST",addr:"0xeaa58b600be48463be28114160b494c53caa6c7d"},
+                //   {symbol:"BTX",addr:"0xbc956adfeae086cb8370420d702f9499bfe4505f"},
+                //   {symbol:"SKY",addr:"0x15c0b319155ca02e4ed78e998597eb5893a0aef8"}
+                // ];
+              }else if(web3js.version.network==4){
+                  acc+= " (Rinkeby Testnet)";
+              }else{
+                  acc+= " Unknown net:"+web3js.version.network;
+              }
+            }
+            app.operatorAddr = acc;
+            web3js.eth.defaultAccount = accounts[0];
+          });
+          console.log("curr network is:",web3js.version.network);
+          return;
+        }
+        app.operatorAddr = defAccount;
+
+      }
+
+      var Web3 = require('web3');
+      window.addEventListener('load', function() {
+
+          // Checking if Web3 has been injected by the browser (Mist/MetaMask)
+          if (typeof web3 !== 'undefined') {
+            // Use Mist/MetaMask's provider
+            web3js = new Web3(web3.currentProvider);
+          } else {
+
+            // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
+            web3js = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+          }
+          initWithWeb3();
+
+      });
+      var voteABI =[
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "addOperator",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addrs",
+                      "type": "address[]"
+                  }
+              ],
+              "name": "addOperators",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_owner",
+                      "type": "address"
+                  },
+                  {
+                      "name": "_challengeName",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_challengeTime",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_challengeLocation",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_videoUri",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  }
+              ],
+              "name": "award",
+              "outputs": [
+                  {
+                      "name": "_certId",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_owner",
+                      "type": "address"
+                  },
+                  {
+                      "name": "_challengeName",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_challengeTime",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_challengeLocation",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_videoUri",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  }
+              ],
+              "name": "awardAndCheck",
+              "outputs": [
+                  {
+                      "name": "_certId",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_isAgree",
+                      "type": "bool"
+                  }
+              ],
+              "name": "checkStatus",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_certId",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_isAgree",
+                      "type": "bool"
+                  }
+              ],
+              "name": "checkStatus2",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "delOperator",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addrs",
+                      "type": "address[]"
+                  }
+              ],
+              "name": "delOperators",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [],
+              "name": "doPause",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [],
+              "name": "doUnPause",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "newRecord",
+              "outputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_newCEO",
+                      "type": "address"
+                  }
+              ],
+              "name": "setCEO",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "setCertAddr",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_newCFO",
+                      "type": "address"
+                  }
+              ],
+              "name": "setCFO",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_newCOO",
+                      "type": "address"
+                  }
+              ],
+              "name": "setCOO",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "setRecordAddr",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "newOwner",
+                      "type": "address"
+                  }
+              ],
+              "name": "transferOwnership",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "inputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "constructor"
+          },
+          {
+              "payable": true,
+              "stateMutability": "payable",
+              "type": "fallback"
+          },
+          {
+              "anonymous": false,
+              "inputs": [
+                  {
+                      "indexed": true,
+                      "name": "operator",
+                      "type": "address"
+                  },
+                  {
+                      "indexed": false,
+                      "name": "allow",
+                      "type": "bool"
+                  }
+              ],
+              "name": "OperatorChanged",
+              "type": "event"
+          },
+          {
+              "anonymous": false,
+              "inputs": [
+                  {
+                      "indexed": true,
+                      "name": "previousOwner",
+                      "type": "address"
+                  },
+                  {
+                      "indexed": true,
+                      "name": "newOwner",
+                      "type": "address"
+                  }
+              ],
+              "name": "OwnershipTransferred",
+              "type": "event"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "ceoAddress",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "certAddr",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "cfoAddress",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "cooAddress",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_tokenId",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "getCertificateInfo",
+              "outputs": [
+                  {
+                      "name": "_challengeName",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_challengeTime",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_challengeLocation",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_videoUri",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_checkTime",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_status",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "getNowRecord",
+              "outputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_status",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "isCLevel",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "bool"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "isOperator",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "bool"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "name": "lastCreateCert",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "name": "lastCreateRecord",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "owner",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "paused",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "bool"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "recordAddr",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          }
+      ];
+      var oTokenInst;
+    </script>
+  </body>
+</html>

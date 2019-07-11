@@ -1,0 +1,1267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <title>世界纪录</title>
+  </head>
+  <body style="margin: 3em;">
+    <h1>Record Generator</h1>
+
+    <form id="recordApp">
+      <div class="form-group">
+      <label for="formGroupExampleInput">YourAddress</label>
+        <input type="text" class="form-control" id="operatorAddr" readonly :value="operatorAddr">
+      </div>
+  <div class="form-group">
+    <label for="exampleFormControlSelect1">RecordContract</label>
+    <select class="form-control" id="RecordContract" v-on:change="tcchanged" v-model="tcselected">
+      <option v-for="tcoption in tokencontract" :value="tcoption.addr">{{tcoption.symbol}} : {{tcoption.addr}}</option>
+      <option value="">Other</option>
+    </select>
+  </div>
+  <div class="form-group" v-if="useOther">
+  <label for="formGroupExampleInput">Other Token Contract: {{tokenInfo}}</label>
+    <input type="text" class="form-control" id="SpecifiedTokenCotract" placeholder="0xeea5046af0c516da21d3faca358110d1c2b9b4f1" v-model="otherToken" v-on:change="oTokenChanged">
+  </div>
+
+  <div class="form-group">
+  <label for="formGroupExampleInput">Name</label>
+    <input type="text" class="form-control" id="spender" placeholder="recordName string" v-model="rname">
+  </div>
+  <div class="form-group">
+  <label for="formGroupExampleInput">Value(数值)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordValue uint256" v-model="rvalue">
+  </div>
+  <div class="form-group">
+  <label for="formGroupExampleInput">Unit(单位)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordUnit string" v-model="runit">
+  </div>
+  <div class="form-group">
+    <label for="formGroupExampleInput">Remard(备注)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordRemark string" v-model="rremark">
+  </div>
+  <div class="form-group">
+    <label for="formGroupExampleInput">Pre(前一条)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordPre uint256" v-model="rpre">
+  </div>
+  <div class="form-group">
+    <label for="formGroupExampleInput">Later(后一条)</label>
+    <input type="text" class="form-control" id="value" placeholder="recordUnit uint256" v-model="rlater">
+  </div>
+
+
+  <div class="form-group">
+    <label for="exampleFormControlTextarea1">returnInfo</label>
+    <textarea class="form-control" id="exampleFormControlTextarea1" rows="6">{{inputdata}}</textarea>
+  </div>
+  <button class="btn btn-primary" type="button" id="send" v-on:click="senddata">Send Transaction</button>
+  <button class="btn btn-primary" type="button" id="send" v-on:click="getInfo">getInfo</button>
+
+  <div class="form-group">
+    <label for="formGroupExampleInput">recordID</label>
+    <input type="text" class="form-control" id="value" placeholder="recordId uint256" v-model="recordId">
+  </div>
+  <div class="form-group">
+    <label for="exampleFormControlTextarea1">recordInfo</label>
+    <textarea class="form-control" id="exampleFormControlTextarea1" rows="6">{{inputdata3}}</textarea>
+  </div>
+  <button class="btn btn-primary" type="button" id="send" v-on:click="getRecordById">get</button>
+</form>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+    <script>
+
+    function fillParam(paramRaw){
+      //console.log("raw param: ",paramRaw)
+      return paramRaw.padStart(64,'0');
+    }
+
+    function paramByAddress(address){
+      if (address.startsWith('0x')) address = address.substring(2);
+      return fillParam(address.toLowerCase());
+    }
+
+    function paramByUInt256(value){
+      return fillParam(value);
+    }
+
+    function sendTransactionCallback(err, res){
+      if (err){
+        alert("send Transaction failed : "+err);
+        return;
+      }
+      alert("send ok. result:"+res);
+    }
+
+    function getTxCallBack(wEvent){
+      return function(err, res){
+          if (err){
+            alert("send Transaction failed : "+err);
+            return;
+          }
+          var txid = res;
+          app.retxId = txid;
+          app.inputdata="txId: "+txid;
+          wEvent.watch(function(err, res){
+            if (err){
+              app.inputdata+= " event watch failed: "+wEvent;
+              return;
+            }
+            if (res.transactionHash == txid){
+              app.inputdata += " transaction success at block "+res.blockNumber;
+              app.inputdata += "====res====" + res;
+              wEvent.stopWatching();
+              return;
+            }
+            else{
+              app.inputdata="txId: "+txid+", curr: "+res.transactionHash;
+            }
+          });
+      }
+    }
+
+    var web3js;
+
+    var app = new Vue({
+        el: '#recordApp',
+        data: {
+          operatorAddr: 'initing...',
+          useOther: false,
+          tcselected:'0xbd4686d5bda645c1400cf4d1c0e7e15d3d2eb8e8',
+          otherToken:'',
+          tokenInfo:'',
+
+          rname:"",
+          rvalue:"",
+          runit:"",
+          rremark:"",
+          rpre:"",
+          rlater:"",
+          recordId:"",
+          //testnet MultiSender contract.
+          // spender:'0x41b7cf5bf7d0003d836e5ef4b17689c49c6620b8',
+          //mainnet main outaddr.
+          //  spender:'0xf9978024e59a119a9a410eba9d83981b52edd320',
+          // exactvalue:'',
+          // tokenvalue:'',
+
+
+          inputdata:'',
+          inputdata3:"",
+          retxId:"",
+          tokencontract:[
+            {symbol:"WRecord",addr:"0xbd4686d5bda645c1400cf4d1c0e7e15d3d2eb8e8"}
+          ]
+        },
+        methods: {
+          tcchanged : function (){
+            if (this.tcselected.trim()==""){
+              this.useOther = true;
+            }else{
+              this.useOther = false;
+              // var found = false;
+              // for (let tc of this.tokencontract){
+              //   if (tc.addr == this.tcselected){
+              //     if (!tc.decimal ||!intval(tc.decimal)){
+              //       this.decimal = 18;
+              //     }else{
+              //       this.decimal = tc.decimal;
+              //     }
+              //     found = true;
+              //     break;
+              //   }else{
+              //     //console.log("tc.addr is :",tc.addr," and selected:",this.tcselected);
+              //   }
+              // }
+              // if (!found){
+              //   console.log("should not happen: cannot find value of ",this.tcselected, "in :",this.tokencontract);
+              // }
+            }
+          },
+          // rlaterChanged: function (){
+          //     this.rlater = new web3.BigNumber(this.rlater);
+          //   // var power = new web3.BigNumber("1e+"+this.decimal);
+          //   // var tc = eBigNum.div(power);
+          //   // if (tc.toNumber() == this.tokenvalue) {
+          //   //   //console.log("tokenvalue is same as evalue ,",tc);
+          //   //   return;
+          //   // }
+          //   // //console.log("tokenvalue is ",this.tokenvalue,", and evalue ,",tc);
+          //   // this.tokenvalue = tc.toNumber();
+          // },
+          // rpreChanged: function (){
+          //     this.rpre = new web3.BigNumber(this.rpre);
+          //   // var tBigNum = new web3.BigNumber(this.tokenvalue);
+          //   // var power = new web3.BigNumber("1e+"+this.decimal);
+          //   // var ec = tBigNum.times(power);
+          //   // if (ec.toFixed(0) == this.exactvalue){
+          //   //   //console.log("tokenvalue is same as evalue ,",this.exactvalue);
+          //   //   return;
+          //   // }
+          //   // //console.log("tokenvalue is ",this.tokenvalue,", and evalue ,",ec);
+          //   // this.exactvalue = ec.toFixed(0);
+          // },
+          oTokenChanged: function(){
+            if (!web3js.isConnected()){
+              console.log("cannot find metamask or any connected node.");
+              return;
+            }
+            oTokenInst = web3js.eth.contract(recordABI).at(this.otherToken);
+            // oTokenInst.symbol(function(err,res){
+            //   if (err){
+            //     console.log("cannot read token symbol of ",this.otherToken," as error:",err," and inst:",oTokenInst);
+            //     return;
+            //   }
+            //   var tSymbol = res;
+            //   oTokenInst.name(function(err,res){
+            //     if (err){
+            //       app.tokenInfo = '('+tSymbol+')';
+            //     }else{
+            //       app.tokenInfo = res+' ('+tSymbol+')';
+            //     }
+            //     oTokenInst.decimals(function(err,res){
+            //       if (err){
+            //         console.log("cannot read token decimal of ",this.otherToken," as error:",err," and inst:",oTokenInst);
+            //         return;
+            //       }
+            //       var oldDecimal = app.decimal;
+            //       app.decimal = parseInt(res);
+            //       if (app.tokenvalue && oldDecimal != app.decimal){
+            //         app.tvalueChanged();
+            //       }
+            //     });
+            //   });
+            // });
+
+          },
+          senddata: function(){
+            if (!web3js || !web3js.isConnected()){
+              alert("No MetaMask or connected node. You cannot send transaction.");
+              return;
+            }
+            var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+            oTokenInst = web3js.eth.contract(recordABI).at(tokenAddr);
+            var sendParam = null;
+            var wEvent = oTokenInst.NewRecord({"_name":this.rname,"_value": this.rvalue});
+            if (sendParam){
+              oTokenInst.newRecord.sendTransaction(this.rname,this.rvalue, this.runit, this.rremark, new web3js.BigNumber(this.rpre),new web3js.BigNumber(this.rlater),sendParam,getTxCallBack(wEvent));
+            }else{
+              oTokenInst.newRecord.sendTransaction(this.rname,this.rvalue, this.runit, this.rremark, new web3js.BigNumber(this.rpre),new web3js.BigNumber(this.rlater),getTxCallBack(wEvent));
+            }
+          },
+          getRecordById: function(){
+            if (!web3js || !web3js.isConnected()){
+              alert("No MetaMask or connected node. You cannot send transaction.");
+              return;
+            }
+            var tokenAddr = this.useOther?this.tokenAddr:this.tcselected;
+            oTokenInst = web3js.eth.contract(recordABI).at(tokenAddr);
+            oTokenInst.getNowRecord(new web3js.BigNumber(app.recordId), function(err,res){
+              if (err){
+                console.log("cannot read token symbol of ",this.otherToken," as error:",err," and inst:",oTokenInst);
+                return;
+              }
+              console.log(res);
+              app.inputdata3 = res;
+            });
+          },
+          getInfo: function(){
+            if(app.retxId.trim() == ''){
+                alert("retxId is not return,wait!");
+                return;
+            }
+
+            web3js.eth.getTransactionReceipt(app.retxId , function(err, receipt){
+                if(err){
+                    alert(err);
+                    return;
+                }
+                if(receipt == null){
+                    alert("transaction is not comfirmed,wait!");
+                    return;
+                }
+                app.inputdata += "\r" + receipt.logs[0].data;
+                //debugger;
+                // app.inputdata += "\r" + web3js.eth.abi.decodeLog(['string','string','uint256','string','string','uint256','uint256'], receipt.logs[0].data);
+                // app.inputdata += "\r" + web3js.eth.abi.decodeLog([
+                //     {
+                //         "indexed": true,
+                //         "name": "_name",
+                //         "type": "string"
+                //     },
+                //     {
+                //         "indexed": true,
+                //         "name": "_value",
+                //         "type": "string"
+                //     },
+                //     {
+                //         "indexed": false,
+                //         "name": "_recordId",
+                //         "type": "uint256"
+                //     },
+                //     {
+                //         "indexed": false,
+                //         "name": "_unit",
+                //         "type": "string"
+                //     },
+                //     {
+                //         "indexed": false,
+                //         "name": "_remark",
+                //         "type": "string"
+                //     },
+                //     {
+                //         "indexed": false,
+                //         "name": "_pre",
+                //         "type": "uint256"
+                //     },
+                //     {
+                //         "indexed": false,
+                //         "name": "_later",
+                //         "type": "uint256"
+                //     }
+                // ], receipt.logs[0].data, receipt.logs[0].topics);
+            });
+          }
+        }
+      });
+
+      function initWithWeb3(){
+        var defAccount = web3js.eth.defaultAccount;
+        if (!web3js.isConnected()){
+          defAccount += " (Disconnected)";
+        }else if (defAccount!= undefined && defAccount != '' ){
+
+        }
+        else{
+          web3.eth.getAccounts(function(error, accounts){
+            var acc = accounts[0];
+            if (web3js.version.network!=1){
+              if (web3js.version.network==3){
+                acc+= " (Ropsten Testnet)";
+                //replace to testnet token contracts.
+                // app.tokencontract = [
+                //   {symbol:"SKYTEST",addr:"0xeaa58b600be48463be28114160b494c53caa6c7d"},
+                //   {symbol:"BTX",addr:"0xbc956adfeae086cb8370420d702f9499bfe4505f"},
+                //   {symbol:"SKY",addr:"0x15c0b319155ca02e4ed78e998597eb5893a0aef8"}
+                // ];
+              }else if(web3js.version.network==4){
+                  acc+= " (Rinkeby Testnet)";
+              }else{
+                  acc+= " Unknown net:"+web3js.version.network;
+              }
+            }
+            app.operatorAddr = acc;
+            web3js.eth.defaultAccount = accounts[0];
+          });
+          console.log("curr network is:",web3js.version.network);
+          return;
+        }
+        app.operatorAddr = defAccount;
+
+      }
+
+      var Web3 = require('web3');
+      window.addEventListener('load', function() {
+
+          // Checking if Web3 has been injected by the browser (Mist/MetaMask)
+          if (typeof web3 !== 'undefined') {
+            // Use Mist/MetaMask's provider
+            web3js = new Web3(web3.currentProvider);
+          } else {
+
+            // fallback - use your fallback strategy (local node / hosted node + in-dapp id mgmt / fail)
+            web3js = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+          }
+          initWithWeb3();
+
+      });
+      var recordABI =[
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addrs",
+                      "type": "address[]"
+                  }
+              ],
+              "name": "delOperators",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "cfoAddress",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "ceoAddress",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "isRecordFirst",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "bool"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_newCEO",
+                      "type": "address"
+                  }
+              ],
+              "name": "setCEO",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_status",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "updateRecord",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_newCOO",
+                      "type": "address"
+                  }
+              ],
+              "name": "setCOO",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "delOperator",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "getNowRecord",
+              "outputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_status",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "certificateDecre",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_newCFO",
+                      "type": "address"
+                  }
+              ],
+              "name": "setCFO",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "paused",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "bool"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "getRecordLength",
+              "outputs": [
+                  {
+                      "name": "_len",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "getPreRecord",
+              "outputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_status",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [],
+              "name": "doPause",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "isOperator",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "bool"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [],
+              "name": "doUnPause",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "updateLater",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "isRecordLast",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "bool"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "getBindCertificate",
+              "outputs": [
+                  {
+                      "name": "certIds",
+                      "type": "uint256[]"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_certIds",
+                      "type": "uint256[]"
+                  }
+              ],
+              "name": "bindCertificateArray",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "owner",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_certId",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "bindCertificate",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "addOperator",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "recordArray",
+              "outputs": [
+                  {
+                      "name": "name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "status",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "later",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "certValidCount",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_addrs",
+                      "type": "address[]"
+                  }
+              ],
+              "name": "addOperators",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "updatePre",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [],
+              "name": "cooAddress",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "address"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "updatePreLater",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_addr",
+                      "type": "address"
+                  }
+              ],
+              "name": "isCLevel",
+              "outputs": [
+                  {
+                      "name": "",
+                      "type": "bool"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  }
+              ],
+              "name": "updateBaseInfo",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "certificateIncre",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_status",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "updateStatus",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "newOwner",
+                      "type": "address"
+                  }
+              ],
+              "name": "transferOwnership",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "newRecord",
+              "outputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "constant": true,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "getLaterRecord",
+              "outputs": [
+                  {
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "name": "_status",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "payable": false,
+              "stateMutability": "view",
+              "type": "function"
+          },
+          {
+              "constant": false,
+              "inputs": [
+                  {
+                      "name": "_index",
+                      "type": "uint256"
+                  },
+                  {
+                      "name": "_certificateArray",
+                      "type": "uint256[]"
+                  }
+              ],
+              "name": "undateCertificateArray",
+              "outputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "function"
+          },
+          {
+              "inputs": [],
+              "payable": false,
+              "stateMutability": "nonpayable",
+              "type": "constructor"
+          },
+          {
+              "payable": true,
+              "stateMutability": "payable",
+              "type": "fallback"
+          },
+          {
+              "anonymous": false,
+              "inputs": [
+                  {
+                      "indexed": true,
+                      "name": "_name",
+                      "type": "string"
+                  },
+                  {
+                      "indexed": true,
+                      "name": "_value",
+                      "type": "string"
+                  },
+                  {
+                      "indexed": false,
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "indexed": false,
+                      "name": "_unit",
+                      "type": "string"
+                  },
+                  {
+                      "indexed": false,
+                      "name": "_remark",
+                      "type": "string"
+                  },
+                  {
+                      "indexed": false,
+                      "name": "_pre",
+                      "type": "uint256"
+                  },
+                  {
+                      "indexed": false,
+                      "name": "_later",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "NewRecord",
+              "type": "event"
+          },
+          {
+              "anonymous": false,
+              "inputs": [
+                  {
+                      "indexed": false,
+                      "name": "_recordId",
+                      "type": "uint256"
+                  },
+                  {
+                      "indexed": false,
+                      "name": "_certId",
+                      "type": "uint256"
+                  }
+              ],
+              "name": "BindCertificate",
+              "type": "event"
+          },
+          {
+              "anonymous": false,
+              "inputs": [
+                  {
+                      "indexed": true,
+                      "name": "operator",
+                      "type": "address"
+                  },
+                  {
+                      "indexed": false,
+                      "name": "allow",
+                      "type": "bool"
+                  }
+              ],
+              "name": "OperatorChanged",
+              "type": "event"
+          },
+          {
+              "anonymous": false,
+              "inputs": [
+                  {
+                      "indexed": true,
+                      "name": "previousOwner",
+                      "type": "address"
+                  },
+                  {
+                      "indexed": true,
+                      "name": "newOwner",
+                      "type": "address"
+                  }
+              ],
+              "name": "OwnershipTransferred",
+              "type": "event"
+          }
+      ];
+      // var erc20ABI = [{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}],"name":"approve","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"totalSupply","outputs":[{"name":"","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_from","type":"address"},{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transferFrom","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[],"name":"decimals","outputs":[{"name":"","type":"uint8"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"version","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_subtractedValue","type":"uint256"}],"name":"decreaseApproval","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":true,"inputs":[],"name":"symbol","outputs":[{"name":"","type":"string"}],"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{"name":"_to","type":"address"},{"name":"_value","type":"uint256"}],"name":"transfer","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"},{"name":"_extraData","type":"bytes"}],"name":"approveAndCall","outputs":[{"name":"success","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":false,"inputs":[{"name":"_spender","type":"address"},{"name":"_addedValue","type":"uint256"}],"name":"increaseApproval","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"},{"constant":true,"inputs":[{"name":"_owner","type":"address"},{"name":"_spender","type":"address"}],"name":"allowance","outputs":[{"name":"remaining","type":"uint256"}],"payable":false,"stateMutability":"view","type":"function"},{"inputs":[],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"payable":false,"stateMutability":"nonpayable","type":"fallback"},{"anonymous":false,"inputs":[{"indexed":true,"name":"_from","type":"address"},{"indexed":true,"name":"_to","type":"address"},{"indexed":false,"name":"_value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"name":"_owner","type":"address"},{"indexed":true,"name":"_spender","type":"address"},{"indexed":false,"name":"_value","type":"uint256"}],"name":"Approval","type":"event"}];
+
+      var oTokenInst;
+    </script>
+  </body>
+</html>

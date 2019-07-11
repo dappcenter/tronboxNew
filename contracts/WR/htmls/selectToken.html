@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+    <title>Select Token</title>
+</head>
+<body style="margin: 3em;">
+
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="../js/common.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js/dist/web3.min.js"></script>
+<script>
+    function searchToken(address){
+        App.checkConnected();
+        if(!App.checkERC20Addr(address)){
+            alert("The ERC20 address is invalid.");
+            return;
+        }
+        var oTokenInst = App.web3js.eth.contract(App.erc20ABI).at(address);
+        oTokenInst.symbol(function(err,res){
+            if (err){
+                console.log("cannot read token symbol of ",address," as error:",err," and inst:",oTokenInst);
+                return;
+            }
+            var tSymbol = res;
+            oTokenInst.name(function(err,res){
+                if (err){
+                    console.log("cannot read token name of ",address," as error:",err," and inst:",oTokenInst);
+                    return;
+                }
+                var tName = res;
+                oTokenInst.decimals(function(err,res){
+                    if (err){
+                        console.log("cannot read token decimal of ",this.otherToken," as error:",err," and inst:",oTokenInst);
+                        return;
+                    }
+                    var tDecimal = parseInt(res);
+                });
+            });
+        });
+    }
+</script>
+</body>
+</html>
