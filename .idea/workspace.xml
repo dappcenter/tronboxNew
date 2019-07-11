@@ -2,62 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="57206c0b-d6ba-4822-87f0-4ffd8393ae5f" name="Default" comment="">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/tronboxNew.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/Address.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/BaseTrc10Pool.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/BaseTrc20Pool.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/BttBank.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/DWCertificate.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/DWOperatable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/DWOwnable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/DWPausable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/DWRecord.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/DWVote.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/Demo.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/KKPool.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/KKPoolOld.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/KKReferral.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/KKSeed.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/KKStake.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/KKToken.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/KittyCore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/Migrations.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/Operatable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/Ownable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/Pausable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/RedEnvelopes.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/SafeMath.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/SimpleToken.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/StringUtil.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TBS.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TNT.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TNTDivide.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TronBank.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TronBankAuction.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TronBankDice.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TronBankDivide.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TronBankPool.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/TronBankStake.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/UintTest.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/WR/GID.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/WR/WRCertificate.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/WR/WROperatable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/WR/WROwnable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/WR/WRPausable.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/WR/WRVote.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/WR/WRecord.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/WorldRecordToken.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/a.html" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/contracts/aa.sol" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/migrations/1_initial_migration.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/migrations/2_deploy_contracts.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/test/.git-folder-keeper" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tronbox-config.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/tronbox.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/contracts/a.html" beforeDir="false" afterPath="$PROJECT_DIR$/contracts/a.html" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -95,24 +41,6 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="WRVote.sol" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/contracts/WR/WRVote.sol">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="647">
-              <caret line="74" lean-forward="true" selection-start-line="74" selection-end-line="74" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="WROperatable.sol" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/contracts/WR/WROperatable.sol">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="719">
-              <caret line="108" selection-start-line="108" selection-end-line="108" />
-            </state>
-          </provider>
-        </entry>
-      </file>
       <file leaf-file-name="WROwnable.sol" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/contracts/WR/WROwnable.sol">
           <provider selected="true" editor-type-id="text-editor">
@@ -140,11 +68,30 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name=".gitignore" pinned="false" current-in-tab="true">
+      <file leaf-file-name=".gitignore" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/.gitignore">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="36">
               <caret line="2" column="12" selection-start-line="2" selection-end-line="2" selection-end-column="12" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="README.md" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/README.md">
+          <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+            <state split_layout="SPLIT">
+              <first_editor />
+              <second_editor />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="a.html" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/contracts/a.html">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="169">
+              <caret line="11" column="23" selection-start-line="11" selection-start-column="23" selection-end-line="11" selection-end-column="23" />
             </state>
           </provider>
         </entry>
@@ -211,7 +158,6 @@
         <option value="$PROJECT_DIR$/contracts/UintTest.sol" />
         <option value="$PROJECT_DIR$/contracts/DWControlBase.sol" />
         <option value="$PROJECT_DIR$/contracts/KittyCore" />
-        <option value="$PROJECT_DIR$/contracts/a.html" />
         <option value="$PROJECT_DIR$/contracts/TronBankAuction.sol" />
         <option value="$PROJECT_DIR$/contracts/SafeMath.sol" />
         <option value="$PROJECT_DIR$/contracts/StringUtil.sol" />
@@ -230,6 +176,7 @@
         <option value="$PROJECT_DIR$/contracts/WR/GID.sol" />
         <option value="$PROJECT_DIR$/contracts/WR/WRecord.sol" />
         <option value="$PROJECT_DIR$/contracts/WR/WRPausable.sol" />
+        <option value="$PROJECT_DIR$/contracts/a.html" />
       </list>
     </option>
   </component>
@@ -262,6 +209,11 @@
             <path>
               <item name="tronboxNew" type="b2602c69:ProjectViewProjectNode" />
               <item name="tronboxNew" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="tronboxNew" type="b2602c69:ProjectViewProjectNode" />
+              <item name="tronboxNew" type="462c0819:PsiDirectoryNode" />
+              <item name="contracts" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -366,12 +318,12 @@
       <workItem from="1561901347128" duration="7115000" />
       <workItem from="1562143367199" duration="11066000" />
       <workItem from="1562463704332" duration="2273000" />
-      <workItem from="1562478613960" duration="772000" />
+      <workItem from="1562478613960" duration="1514000" />
     </task>
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="98382000" />
+    <option name="totallyTimeSpent" value="99124000" />
   </component>
   <component name="ToolWindowManager">
     <frame x="-1920" y="23" width="1920" height="1057" extended-state="6" />
@@ -413,13 +365,6 @@
     <option name="myLimit" value="2678400000" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/contracts/UintTest.sol">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="126">
-          <caret line="7" selection-start-line="7" selection-end-line="9" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/migrations/1_initial_migration.js">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
@@ -478,13 +423,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="36">
           <caret line="2" column="9" selection-start-line="2" selection-start-column="9" selection-end-line="2" selection-end-column="9" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/contracts/a.html">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="547">
-          <caret line="32" selection-start-line="32" selection-end-line="32" />
         </state>
       </provider>
     </entry>
@@ -717,6 +655,21 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="36">
           <caret line="2" column="12" selection-start-line="2" selection-end-line="2" selection-end-column="12" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+        <state split_layout="SPLIT">
+          <first_editor />
+          <second_editor />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/contracts/a.html">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="169">
+          <caret line="11" column="23" selection-start-line="11" selection-start-column="23" selection-end-line="11" selection-end-column="23" />
         </state>
       </provider>
     </entry>
