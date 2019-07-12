@@ -33,7 +33,7 @@ library SafeMath {
 contract Manageable is WROperatable{
     address public admin;
     uint256 public constant decimals = 6;
-    uint256 public totalSupply = 100000000000 * (10 ** 6); // total 500M, fixed amount
+    uint256 public totalSupply = 100000000000 * (10 ** 6); //
 
     uint256 public constant MINT_RATE = 60;
     uint256 public constant ANGEL_RATE = 10; //
@@ -41,13 +41,13 @@ contract Manageable is WROperatable{
     uint256 public constant DEV_RATE = 15; // 15% for Dev
     uint256 public constant EARLY_AWARD_RATE = 3; //3% for early award
 
-    address public mintAccount;
-    address public angelAccount;
-    address public fundAccount;
-    address public devAccount;
-    address public earlyAwardAccount;
+    address public mintAccount = 0x0695632ccdfc649cbeef4c4f53c2cdbc2d834a42;
+    address public angelAccount = 0x0b64de11f7d4744cd721efb6c5449ca9be852287;
+    address public fundAccount = 0xbe5c7055a8cf2283d641d35937aac220f39e901a;
+    address public devAccount =0x8ed2738daeaf08ca3127948fec79c4a6afd78191;
+    address public earlyAwardAccount = 0xe5605e7129ee701dd3b90a2fc616747fd974a78e;
 
-    bool public locked = true;
+    bool public locked = false;
 
     constructor() public {
         admin = msg.sender;
