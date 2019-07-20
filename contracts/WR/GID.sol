@@ -41,11 +41,11 @@ contract Manageable is WROperatable{
     uint256 public constant DEV_RATE = 15; // 15% for Dev
     uint256 public constant EARLY_AWARD_RATE = 3; //3% for early award
 
-    address public mintAccount = 0x0695632ccdfc649cbeef4c4f53c2cdbc2d834a42;
-    address public angelAccount = 0x0b64de11f7d4744cd721efb6c5449ca9be852287;
-    address public fundAccount = 0xbe5c7055a8cf2283d641d35937aac220f39e901a;
-    address public devAccount =0x8ed2738daeaf08ca3127948fec79c4a6afd78191;
-    address public earlyAwardAccount = 0xe5605e7129ee701dd3b90a2fc616747fd974a78e;
+    address public mintAccount;
+    address public angelAccount;
+    address public fundAccount;
+    address public devAccount;
+    address public earlyAwardAccount;
 
     bool public locked = false;
 
@@ -193,11 +193,7 @@ revert();
 }
 
 constructor() public {
-balances[mintAccount] = totalSupply * MINT_RATE / 100;
-balances[angelAccount] = totalSupply * ANGEL_RATE / 100;
-balances[fundAccount] = totalSupply * FUND_RATE / 100;
-balances[devAccount] = totalSupply * DEV_RATE / 100;
-balances[earlyAwardAccount] = totalSupply * EARLY_AWARD_RATE / 100;
+balances[msg.sender] = totalSupply;
 }
 
 /* Approves and then calls the receiving contract */

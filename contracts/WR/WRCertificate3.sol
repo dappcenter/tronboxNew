@@ -7,6 +7,8 @@ contract  ERC721TokenReceiver {
 }
 
 contract SimpleRecord{
+function recoveryCertificate(uint256 _recordId, uint256 _preCertId, uint256 _certId, uint256 _laterCertId) external;
+function unBindCertificate(uint256 _recordId, uint256 _preCertId, uint256 _certId, uint256 _laterCertId) external;
 function bindCertificate(uint256 _recordId, uint256 _certId) external returns(uint256 _preCertId);
 }
 
@@ -48,7 +50,7 @@ function isApprovedForAll(address _owner, address _operator) external view retur
 function tokensOfOwner(address _owner) external view returns (uint256[] memory);
 }
 
-contract WRCertificate is ERC721, WRPausable{
+contract WRCertificate3 is ERC721, WRPausable{
 struct Certificate{
 string challengeName;
 uint256 recordId;
@@ -61,16 +63,16 @@ uint256 pre;
 uint256 later;
 string remark;
 uint256 status;// 0-待审核，1-审核通过，2-审核未通过，4-作废
-uint256 ref;
 }
-event Award(address indexed _owner, string indexed _challengeName, uint256 _certId, uint256 _recordId, uint256 _ref, string _value, uint256 _challengeTime, string _challengeLocation, string _videoUri, uint256 _preCertId, uint256 _status);
-event ChangeStatus(uint256 indexed _tokenId, uint256 _fStatus, uint256 _tStatus);
-event BurnAndTrans(address indexed _owner, address indexed _to, uint256 _tokenId, uint256 _status);
-event ReturnBack(address indexed _owner, address indexed _to, uint256 _tokenId, uint256 _status);
+event Award(address indexed _owner, string indexed _challengeName, uint256 _certId, uint256 _recordId, string _value, uint256 _challengeTime, string _challengeLocation, string _videoUri, uint256 _checkTime, uint256 _preCertId, string _remark, uint256 _status);
+event CheckResult(uint256 indexed _certId,bool _isAgree);
+event Burned(address indexed _owner, uint256 _tokenId, uint256 _preCertId, uint256 _laterCertId, uint256 _status);
+event ReturnBack(address indexed _owner, uint256 _tokenId, uint256 _preCertId, uint256 _laterCertId, uint256 _status);
 Certificate[] private certificates;
 mapping(uint256 => address) private certIndexToOwner;
-mapping(uint256 => uint256) private childCount;
+mapping(uint256 => address) private burnedCertIndexToOwner;
 mapping(address => uint256) private ownerToTokenCount;
+mapping(address => uint256) private ownerToBurnedTokenCount;
 mapping(uint256 => address) private certIndexToApproved;
 mapping (address => mapping (address => bool)) private ownerToAllApproved;
 address public recordAddr;
@@ -78,6 +80,7 @@ string public baseTokenUri;
 string public constant name = "WorldRecordCertificate";
 string public constant symbol = "WRC";
 
+uint256 public secondsPerBlock = 15;
 bool public locked = true;
 
 modifier OnlyCanTransfer(address _to) {
@@ -104,6 +107,16 @@ bytes4(keccak256('tokenURI(uint256)')) ^
 bytes4(keccak256('totalSupply()')) ^
 bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)')) ^
 bytes4(keccak256('tokenByIndex(uint256)'));
+// bytes4 private constant _ERC721_RECEIVED = 0x150b7a02;
+// bytes4 private constant _INTERFACE_ID_ERC165 = 0x01ffc9a7;
+// bytes4 private constant _INTERFACE_ID_ERC721 = bytes4(keccak256('name()')) ^
+// bytes4(keccak256('transfer(address,uint256)')) ^
+// bytes4(keccak256('tokensOfOwner(address)')) ^
+// bytes4(keccak256('symbol()')) ^
+// bytes4(keccak256('tokenURI(uint256)')) ^
+// bytes4(keccak256('totalSupply()')) ^
+// bytes4(keccak256('tokenOfOwnerByIndex(address,uint256)')) ^
+// bytes4(keccak256('tokenByIndex(uint256)')) ^ 0x80ac58cd;
 
 function _owns(address _owner, uint256 _tokenId) internal view returns (bool) {
 return certIndexToOwner[_tokenId] == _owner;
@@ -142,7 +155,7 @@ return (retVal == _ERC721_RECEIVED);
 }
 
 function _exists(uint256 _tokenId) internal view returns (bool) {
-return _tokenId < certificates.length && _tokenId > 0;
+return certIndexToOwner[_tokenId] != address(0);
 }
 
 function _isApprovedOrOwner(address _spender, uint256 _tokenId) internal view returns (bool) {
@@ -153,6 +166,10 @@ return (isOperator(_spender) || _spender == _owner || getApproved(_tokenId) == _
 
 function setLock(bool _value) onlyOwner external {
 locked = _value;
+}
+
+function setSecondsPerBlock(uint256 val) onlyCLevel external{
+secondsPerBlock = val;
 }
 
 function setRecordAddr(address _addr) onlyCLevel external{
@@ -168,13 +185,17 @@ require(_owner != address(0),"ERC721:balance query form the zero address");
 return ownerToTokenCount[_owner];
 }
 
-function childBalanceOf(uint256 _tokenId) public view returns (uint256){
-require(_exists(_tokenId),"ERC721:balance query form the zero address");
-return childCount[_tokenId];
+function burnedBalanceOf(address _owner) public view returns (uint256){
+require(_owner != address(0),"ERC721:balance query form the zero address");
+return ownerToBurnedTokenCount[_owner];
 }
 
 function ownerOf(uint256 _tokenId) public view returns (address _owner){
 _owner = certIndexToOwner[_tokenId];
+}
+
+function burnedOwnerOf(uint256 _tokenId) public view returns (address _owner){
+_owner = burnedCertIndexToOwner[_tokenId];
 }
 
 function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes memory _data) public payable{
@@ -223,7 +244,7 @@ function isApprovedForAll(address _owner, address _operator) public view returns
 return ownerToAllApproved[_owner][_operator];
 }
 
-function tokensOfOwner(address _owner) public view returns (uint256[] memory){
+function tokensOfOwner(address _owner) public view returns (uint256[] memory _tokenIds){
 uint256 tokenCount = balanceOf(_owner);
 if (tokenCount == 0) {
 return new uint256[](0);
@@ -242,17 +263,17 @@ return result;
 }
 }
 
-function childsOfToken(uint256 _tokenId) public view returns (uint256[] memory){
-uint256 _childCount = childBalanceOf(_tokenId);
-if (_childCount == 0) {
+function burnTokensOfOwner(address _owner) public view returns (uint256[] memory _tokenIds){
+uint256 tokenCount = ownerToBurnedTokenCount[_owner];
+if (tokenCount == 0) {
 return new uint256[](0);
 } else {
-uint256[] memory result = new uint256[](_childCount);
+uint256[] memory result = new uint256[](tokenCount);
 uint256 totalCerts = totalSupply();
 uint256 resultIndex = 0;
 uint256 certId;
 for (certId = 1; certId <= totalCerts; certId++) {
-if (certificates[certId].ref == _tokenId) {
+if (burnedCertIndexToOwner[certId] == _owner) {
 result[resultIndex] = certId;
 resultIndex++;
 }
@@ -286,98 +307,62 @@ return 0;
 }
 }
 
-function getCertificateBaseInfo(uint256 _tokenId) view public returns(bool _isRecordHolder, string memory _challengeName, uint256 _recordId, uint256 _ref, string memory _value, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, uint256 _pre, uint256 _later, uint256 _status){
+function getCertificateBaseInfo(uint256 _tokenId) view public returns(bool _isRecordHolder, string memory _challengeName, uint256 _recordId, string memory _value, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, uint256 _checkTime, uint256 _pre, uint256 _later, uint256 _status){
 _isRecordHolder = isRecordHolder(_tokenId);
 _challengeName = certificates[_tokenId].challengeName;
 _recordId = certificates[_tokenId].recordId;
-_ref = certificates[_tokenId].ref;
 _value = certificates[_tokenId].value;
 _challengeTime = certificates[_tokenId].challengeTime;
 _challengeLocation = certificates[_tokenId].challengeLocation;
 _videoUri = certificates[_tokenId].videoUri;
+_checkTime = certificates[_tokenId].checkTime;
 _pre = certificates[_tokenId].pre;
 _later = certificates[_tokenId].later;
 _status = certificates[_tokenId].status;
 }
 
-function getCertificatePreBaseInfo(uint256 _tokenId) view public returns(bool _isRecordHolder, string memory _challengeName, uint256 _recordId, uint256 _ref, string memory _value, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, uint256 _pre, uint256 _later, uint256 _status){
+function getCertificatePreBaseInfo(uint256 _tokenId) view public returns(bool _isRecordHolder, string memory _challengeName, uint256 _recordId, string memory _value, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, uint256 _checkTime, uint256 _pre, uint256 _later, uint256 _status){
 _tokenId = certificates[_tokenId].pre;
 _isRecordHolder = isRecordHolder(_tokenId);
 _challengeName = certificates[_tokenId].challengeName;
 _recordId = certificates[_tokenId].recordId;
-_ref = certificates[_tokenId].ref;
 _value = certificates[_tokenId].value;
 _challengeTime = certificates[_tokenId].challengeTime;
 _challengeLocation = certificates[_tokenId].challengeLocation;
 _videoUri = certificates[_tokenId].videoUri;
+_checkTime = certificates[_tokenId].checkTime;
 _pre = certificates[_tokenId].pre;
 _later = certificates[_tokenId].later;
 _status = certificates[_tokenId].status;
 }
 
-function getCertificateLaterBaseInfo(uint256 _tokenId) view public returns(bool _isRecordHolder, string memory _challengeName, uint256 _recordId, uint256 _ref, string memory _value, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, uint256 _pre, uint256 _later, uint256 _status){
+function getCertificateLaterBaseInfo(uint256 _tokenId) view public returns(bool _isRecordHolder, string memory _challengeName, uint256 _recordId, string memory _value, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, uint256 _checkTime, uint256 _pre, uint256 _later, uint256 _status){
 _tokenId = certificates[_tokenId].later;
 _isRecordHolder = isRecordHolder(_tokenId);
 _challengeName = certificates[_tokenId].challengeName;
 _recordId = certificates[_tokenId].recordId;
-_ref = certificates[_tokenId].ref;
 _value = certificates[_tokenId].value;
 _challengeTime = certificates[_tokenId].challengeTime;
 _challengeLocation = certificates[_tokenId].challengeLocation;
 _videoUri = certificates[_tokenId].videoUri;
-_pre = certificates[_tokenId].pre;
-_later = certificates[_tokenId].later;
-_status = certificates[_tokenId].status;
-}
-
-function getCertificateRefBaseInfo(uint256 _tokenId) view public returns(bool _isRecordHolder, string memory _challengeName, uint256 _recordId, uint256 _ref, string memory _value, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, uint256 _pre, uint256 _later, uint256 _status){
-_tokenId = certificates[_tokenId].ref;
-_isRecordHolder = isRecordHolder(_tokenId);
-_challengeName = certificates[_tokenId].challengeName;
-_recordId = certificates[_tokenId].recordId;
-_ref = certificates[_tokenId].ref;
-_value = certificates[_tokenId].value;
-_challengeTime = certificates[_tokenId].challengeTime;
-_challengeLocation = certificates[_tokenId].challengeLocation;
-_videoUri = certificates[_tokenId].videoUri;
-_pre = certificates[_tokenId].pre;
-_later = certificates[_tokenId].later;
-_status = certificates[_tokenId].status;
-}
-
-function getCertificateExtraInfo(uint256 _tokenId) view public returns(uint256 _checkTime, string memory _remark){
-_remark = certificates[_tokenId].remark;
 _checkTime = certificates[_tokenId].checkTime;
+_pre = certificates[_tokenId].pre;
+_later = certificates[_tokenId].later;
+_status = certificates[_tokenId].status;
 }
 
-function getCertificatePreExtraInfo(uint256 _tokenId) view public returns(uint256 _checkTime, string memory _remark){
+function getCertificateExtraInfo(uint256 _tokenId) view public returns(string memory _remark){
+_remark = certificates[_tokenId].remark;
+}
+
+function getCertificatePreExtraInfo(uint256 _tokenId) view public returns(string memory _remark){
 _tokenId = certificates[_tokenId].pre;
 _remark = certificates[_tokenId].remark;
-_checkTime = certificates[_tokenId].checkTime;
 }
 
-function getCertificateLaterExtraInfo(uint256 _tokenId) view public returns(uint256 _checkTime, string memory _remark){
+function getCertificateLaterExtraInfo(uint256 _tokenId) view public returns(string memory _remark){
 _tokenId = certificates[_tokenId].later;
 _remark = certificates[_tokenId].remark;
-_checkTime = certificates[_tokenId].checkTime;
-}
-
-function getCertificateRefExtraInfo(uint256 _tokenId) view public returns(uint256 _checkTime, string memory _remark){
-_tokenId = certificates[_tokenId].ref;
-_remark = certificates[_tokenId].remark;
-_checkTime = certificates[_tokenId].checkTime;
-}
-
-function getCertificateRef(uint256 _tokenId) view public returns(uint256 _ref){
-_ref = certificates[_tokenId].ref;
-}
-
-function getCertificatePre(uint256 _tokenId) view public returns(uint256 _pre){
-_pre = certificates[_tokenId].pre;
-}
-
-function getCertificateLater(uint256 _tokenId) view public returns(uint256 _later){
-_later = certificates[_tokenId].later;
 }
 
 function updateCertificateRemark(uint256 _tokenId, string memory _remark) onlyOperator public{
@@ -386,16 +371,6 @@ certificates[_tokenId].remark = _remark;
 
 function updateCertificateValue(uint256 _tokenId, string memory _value) onlyOperator public{
 certificates[_tokenId].value = _value;
-}
-
-function updateCertificateRef(uint256 _tokenId, uint256 _ref) onlyOperator public{
-require(_exists(_tokenId), "the token is not exits");
-require(_exists(_ref), "the token is not exits");
-require(certificates[_tokenId].ref > 0,"only child can update ref");
-require(certificates[_ref].ref == 0, "ref token must no ref");
-childCount[certificates[_tokenId].ref]--;
-certificates[_tokenId].ref = _ref;
-childCount[_ref]++;
 }
 
 function updateCertificatePreLater(uint256 _tokenId, uint256 _pre, uint256 _later) onlyOperator public{
@@ -408,9 +383,6 @@ certificates[_tokenId].status = _status;
 }
 
 function isRecordHolder(uint256 _tokenId) view public returns(bool){
-if(certificates[_tokenId].ref > 0){
-_tokenId = certificates[_tokenId].ref;
-}
 if(certificates[_tokenId].status != 1){
 return false;
 }
@@ -424,12 +396,16 @@ return false;
 return true;
 }
 
-function changeStatus(uint256 _certId, uint256 _status) onlyOperator public{
-require(_exists(_certId), "ERC721: operator query for nonexistent token");
-uint256 _tempStatus = certificates[_certId].status;
-certificates[_certId].status = _status;
+function checkStatus(uint256 _certId, bool _isAgree) onlyOperator public{
+require(_exists(_certId) && certificates[_certId].status == 0, "ERC721: now status is not 0");
+if(_isAgree){
+certificates[_certId].status = 1;
+}else{
+certificates[_certId].status = 2;
+_burn(certIndexToOwner[_certId], _certId, certificates[_certId].pre, certificates[_certId].later, 0);
+}
 certificates[_certId].checkTime = now;
-emit ChangeStatus(_certId, _tempStatus, _status);
+emit CheckResult(_certId, _isAgree);
 }
 
 function award(address _owner, string memory _value, string memory _challengeName, uint256 _recordId, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, string memory _remark) onlyOperator public returns(uint256 _certId){
@@ -448,8 +424,7 @@ checkTime: 0,
 pre: 0,
 later: 0,
 remark: _remark,
-status: 0,
-ref: 0
+status: 0
 });
 _certId = certificates.push(_cert) - 1;
 uint256 _preCertId = SimpleRecord(recordAddr).bindCertificate(_recordId, _certId);
@@ -457,66 +432,90 @@ if(_preCertId > 0){
 certificates[_certId].pre = _preCertId;
 certificates[_preCertId].later = _certId;
 }
-emit Award(_owner, _challengeName, _certId, _recordId, 0, _value, _challengeTime, _challengeLocation, _videoUri, _preCertId, 0);
+emit Award(_owner, _challengeName, _certId, _recordId, _value, _challengeTime, _challengeLocation, _videoUri, 0, _preCertId, _remark, 0);
 _transfer(address(0), _owner, _certId);
 }
 
-function awardRef(address _owner, uint256 _ref, string memory _value, string memory _challengeName, uint256 _challengeTime, string memory _challengeLocation, string memory _videoUri, string memory _remark) onlyOperator public returns(uint256 _certId){
-require(_owner != address(0), "ERC721:the owner is invalid");
-require(_exists(_ref), "ERC721: operator query for nonexistent token");
-require(certificates[_ref].ref == 0, "max ref is two!");
-if(_challengeTime == 0){
-_challengeTime = now;
-}
-Certificate memory _cert = Certificate({
-challengeName: _challengeName,
-recordId: 0,
-value: _value,
-challengeTime: _challengeTime,
-challengeLocation: _challengeLocation,
-videoUri: _videoUri,
-checkTime: 0,
-pre: 0,
-later: 0,
-remark: _remark,
-status: 0,
-ref: _ref
-});
-_certId = certificates.push(_cert) - 1;
-childCount[_ref]++;
-emit Award(_owner, _challengeName, _certId, 0, _ref, _value, _challengeTime, _challengeLocation, _videoUri, 0, 0);
-_transfer(address(0), _owner, _certId);
-}
-
-function returnBack(uint256 _tokenId, address _to) onlyOperator public{
-require(_to != address(0));
-require(_to != address(this));
-uint256 _tempStatus = certificates[_tokenId].status;
-certificates[_tokenId].status = 1;
-certificates[_tokenId].checkTime = now;
-_transfer(certIndexToOwner[_tokenId], _to, _tokenId);
-emit ReturnBack(certIndexToOwner[_tokenId], _to, _tokenId, _tempStatus);
-}
-
-function burnTrans(uint256 _tokenId, address _to) onlyOperator public{
-require(_to != address(0));
-require(_to != address(this));
-uint256 _tempStatus = certificates[_tokenId].status;
-certificates[_tokenId].status = 4;
-certificates[_tokenId].checkTime = now;
-_transfer(certIndexToOwner[_tokenId], _to, _tokenId);
-emit BurnAndTrans(certIndexToOwner[_tokenId], _to, _tokenId, _tempStatus);
-}
-
-function burn(uint256 _tokenId) public {
-require(_isApprovedOrOwner(msg.sender, _tokenId), "ERC721: transfer caller is not owner nor approved");
-address _from = certIndexToOwner[_tokenId];
+function _burn(address _from, uint256 _tokenId, uint256 _preCertId, uint256 _laterCertId, uint256 _status) internal {
 certIndexToOwner[_tokenId] = address(0);
 if (_from != address(0)) {
 ownerToTokenCount[_from]--;
 delete certIndexToApproved[_tokenId];
+burnedCertIndexToOwner[_tokenId] = _from;
+ownerToBurnedTokenCount[_from]++;
 }
-emit Transfer(_from, address(0), _tokenId);
+emit Burned(_from, _tokenId, _preCertId, _laterCertId, _status);
+}
+
+function returnBackArgs(uint256 _tokenId, uint256 _preCertId, uint256 _laterCertId) public onlyOperator{
+address _to = burnedCertIndexToOwner[_tokenId];
+require(address(0) != _to,"ERC721: args are not match");
+uint256 _tempStatus = certificates[_tokenId].status;
+certificates[_tokenId].status = 1;
+
+certificates[_tokenId].pre = _preCertId;
+certificates[_tokenId].later = _laterCertId;
+
+if(_preCertId > 0){
+require(certificates[_preCertId].later == _laterCertId, "list relation is wrong");
+certificates[_preCertId].later = _tokenId;
+}
+if(_laterCertId > 0){
+require(certificates[_laterCertId].pre == _preCertId, "list relation is wrong");
+certificates[_laterCertId].pre = _tokenId;
+}
+SimpleRecord(recordAddr).recoveryCertificate(certificates[_tokenId].recordId, _preCertId, _tokenId, _laterCertId);
+
+certificates[_tokenId].checkTime = now;
+burnedCertIndexToOwner[_tokenId] = address(0);
+ownerToBurnedTokenCount[_to]--;
+ownerToTokenCount[_to]++;
+certIndexToOwner[_tokenId] = _to;
+emit ReturnBack(_to, _tokenId, _preCertId, _laterCertId, _tempStatus);
+}
+
+function returnBack(uint256 _tokenId) public onlyOperator{
+address _to = burnedCertIndexToOwner[_tokenId];
+require(address(0) != _to,"ERC721: args are not match");
+uint256 _tempStatus = certificates[_tokenId].status;
+certificates[_tokenId].status = 1;
+
+uint256 _preCertId = certificates[_tokenId].pre;
+uint256 _laterCertId = certificates[_tokenId].later;
+
+if(_preCertId > 0){
+require(certificates[_preCertId].later == _laterCertId);
+certificates[_preCertId].later = _tokenId;
+}
+if(_laterCertId > 0){
+require(certificates[_laterCertId].pre == _preCertId);
+certificates[_laterCertId].pre = _tokenId;
+}
+SimpleRecord(recordAddr).recoveryCertificate(certificates[_tokenId].recordId, _preCertId, _tokenId, _laterCertId);
+
+certificates[_tokenId].checkTime = now;
+burnedCertIndexToOwner[_tokenId] = address(0);
+ownerToBurnedTokenCount[_to]--;
+ownerToTokenCount[_to]++;
+certIndexToOwner[_tokenId] = _to;
+emit ReturnBack(_to, _tokenId, _preCertId, _laterCertId, _tempStatus);
+}
+
+function burn(uint256 _tokenId) public{
+require(_isApprovedOrOwner(msg.sender, _tokenId), "ERC721: caller is not owner nor approved");
+
+uint256 _preCertId = certificates[_tokenId].pre;
+uint256 _laterCertId = certificates[_tokenId].later;
+if(_preCertId > 0){
+certificates[_preCertId].later = certificates[_tokenId].later;
+}
+if(_laterCertId > 0){
+certificates[_laterCertId].pre = certificates[_tokenId].pre;
+}
+SimpleRecord(recordAddr).unBindCertificate(certificates[_tokenId].recordId, _preCertId, _tokenId, _laterCertId);
+uint256 _tempStatus = certificates[_tokenId].status;
+certificates[_tokenId].status = 4;
+_burn(certIndexToOwner[_tokenId], _tokenId, _preCertId, _laterCertId, _tempStatus);
 }
 
 function () payable external{
@@ -535,8 +534,7 @@ checkTime: 0,
 pre: 0,
 later: 0,
 remark: "",
-status: 0,
-ref: 0
+status: 0
 }));
 }
 
