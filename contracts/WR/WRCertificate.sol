@@ -164,12 +164,10 @@ baseTokenUri = str;
 }
 
 function balanceOf(address _owner) public view returns (uint256){
-require(_owner != address(0),"ERC721:balance query form the zero address");
 return ownerToTokenCount[_owner];
 }
 
 function childBalanceOf(uint256 _tokenId) public view returns (uint256){
-require(_exists(_tokenId),"ERC721:balance query form the zero address");
 return childCount[_tokenId];
 }
 
